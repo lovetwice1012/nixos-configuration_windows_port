@@ -70,6 +70,25 @@ FloatingWindow {
     readonly property string scriptsDir: "/home/ilyamiro/.config/hypr/scripts/quickshell/calendar"
 
     // -------------------------------------------------------------------------
+    // TIME OF DAY DYNAMIC COLORS
+    // -------------------------------------------------------------------------
+    readonly property color timeColor: {
+        let h = window.currentTime.getHours();
+        if (h >= 5 && h < 12) return window.peach;      // Morning
+        if (h >= 12 && h < 17) return window.sapphire;  // Afternoon
+        if (h >= 17 && h < 21) return window.mauve;     // Evening
+        return window.blue;                             // Night
+    }
+
+    readonly property color timeAccent: {
+        let h = window.currentTime.getHours();
+        if (h >= 5 && h < 12) return window.yellow;     // Morning Accent
+        if (h >= 12 && h < 17) return window.teal;      // Afternoon Accent
+        if (h >= 17 && h < 21) return window.pink;      // Evening Accent
+        return window.mauve;                            // Night Accent
+    }
+
+    // -------------------------------------------------------------------------
     // ANIMATIONS & INTRO
     // -------------------------------------------------------------------------
     property real introState: 0.0
@@ -243,49 +262,40 @@ FloatingWindow {
             clip: true
 
             // =======================================================
-            // AMBIENT WIDGET COLOR BLOBS
+            // AMBIENT WIDGET COLOR BLOBS (Time & Weather Driven)
             // =======================================================
             Item {
                 anchors.fill: parent
                 z: -1
                 
+                // Primary Weather Blob
                 Rectangle {
                     width: 800; height: 800; radius: 400
-                    color: window.mauve
-                    opacity: 0.04
-                    x: -200; y: -200
-                    SequentialAnimation on x {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0; duration: 15000; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: -200; duration: 15000; easing.type: Easing.InOutSine }
-                    }
+                    x: (parent.width / 2 - width / 2) + Math.cos(window.globalOrbitAngle * 1.5) * 200
+                    y: (parent.height / 2 - height / 2) + Math.sin(window.globalOrbitAngle * 1.5) * 150
+                    color: window.activeWeatherHex
+                    opacity: 0.05
+                    Behavior on color { ColorAnimation { duration: 1500 } }
                 }
+
+                // Time of Day Blob
                 Rectangle {
                     width: 700; height: 700; radius: 350
-                    color: window.sapphire
+                    x: (parent.width / 2 - width / 2) + Math.sin(window.globalOrbitAngle * -1.2) * 250
+                    y: (parent.height / 2 - height / 2) + Math.cos(window.globalOrbitAngle * -1.2) * 200
+                    color: window.timeColor
                     opacity: 0.04
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.rightMargin: -150
-                    anchors.bottomMargin: -150
-                    SequentialAnimation on anchors.bottomMargin {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0; duration: 12000; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: -150; duration: 12000; easing.type: Easing.InOutSine }
-                    }
+                    Behavior on color { ColorAnimation { duration: 1500 } }
                 }
+
+                // Time Accent Blob
                 Rectangle {
                     width: 600; height: 600; radius: 300
-                    color: window.peach
+                    x: (parent.width / 2 - width / 2) + Math.cos(window.globalOrbitAngle * 2.0) * -150
+                    y: (parent.height / 2 - height / 2) + Math.sin(window.globalOrbitAngle * 2.0) * -100
+                    color: window.timeAccent
                     opacity: 0.04
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: -100
-                    SequentialAnimation on anchors.topMargin {
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 50; duration: 18000; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: -100; duration: 18000; easing.type: Easing.InOutSine }
-                    }
+                    Behavior on color { ColorAnimation { duration: 1500 } }
                 }
             }
 

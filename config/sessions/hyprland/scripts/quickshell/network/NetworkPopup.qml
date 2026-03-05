@@ -230,11 +230,19 @@ FloatingWindow {
                 let textData = this.text.trim(); if (textData === "") return;
                 try {
                     let data = JSON.parse(textData)
-                    window.wifiPower = data.power || "off"
+                    let fetchedPower = data.power || "off"
                     
                     if (window.expectedWifiPower !== "") {
-                        if (window.wifiPower === window.expectedWifiPower) { window.wifiPowerPending = false; window.expectedWifiPower = ""; wifiPendingReset.stop(); }
-                    } else { window.wifiPowerPending = false; }
+                        if (fetchedPower === window.expectedWifiPower) { 
+                            window.wifiPower = fetchedPower;
+                            window.wifiPowerPending = false; 
+                            window.expectedWifiPower = ""; 
+                            wifiPendingReset.stop(); 
+                        }
+                    } else { 
+                        window.wifiPower = fetchedPower;
+                        window.wifiPowerPending = false; 
+                    }
 
                     // Only update the reference if the JSON actively changed to prevent UI reloading!
                     let newConnected = data.connected;
@@ -284,11 +292,19 @@ FloatingWindow {
                 let textData = this.text.trim(); if (textData === "") return;
                 try {
                     let data = JSON.parse(textData)
-                    window.btPower = data.power || "off"
+                    let fetchedPower = data.power || "off"
                     
                     if (window.expectedBtPower !== "") {
-                        if (window.btPower === window.expectedBtPower) { window.btPowerPending = false; window.expectedBtPower = ""; btPendingReset.stop(); }
-                    } else { window.btPowerPending = false; }
+                        if (fetchedPower === window.expectedBtPower) { 
+                            window.btPower = fetchedPower;
+                            window.btPowerPending = false; 
+                            window.expectedBtPower = ""; 
+                            btPendingReset.stop(); 
+                        }
+                    } else { 
+                        window.btPower = fetchedPower;
+                        window.btPowerPending = false; 
+                    }
 
                     // Only update the reference if the JSON actively changed to prevent UI reloading!
                     let newBtConnected = data.connected;
@@ -319,7 +335,6 @@ FloatingWindow {
             }
         }
     }
-
     Timer {
         interval: window.busyTask !== "" ? 1000 : 3000
         running: true; repeat: true

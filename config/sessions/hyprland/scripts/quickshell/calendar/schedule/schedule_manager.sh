@@ -6,8 +6,8 @@ CACHE_FILE="${CACHE_DIR}/schedule.json"
 CACHE_LIMIT=600 # 1 Hour
 
 # UPDATED: Script Paths now point to your new Hyprland calendar setup
-UPDATER_SCRIPT="$HOME/.config/hypr/scripts/calendar/schedule/get_schedule.py"
-SHELL_NIX="$HOME/.config/hypr/scripts/calendar/schedule/shell.nix"
+UPDATER_SCRIPT="$HOME/.config/hypr/scripts/quickshell/calendar/schedule/get_schedule.py"
+SHELL_NIX="$HOME/.config/hypr/scripts/quickshell/calendar/schedule/shell.nix"
 
 mkdir -p "$CACHE_DIR"
 

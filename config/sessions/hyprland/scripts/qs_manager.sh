@@ -19,7 +19,7 @@ get_qml_info() {
         calendar)  QML_FILE="calendar/CalendarPopup.qml";    FOCUS="title:calendar_win" ;;
         music)     QML_FILE="music/MusicPopup.qml";          FOCUS="title:music_win" ;;
         network)   QML_FILE="network/NetworkPopup.qml";      FOCUS="title:network-popup" ;;
-        stewart)     QML_FILE="stewart/stewart.qml";           FOCUS="title:stewart" ;;
+        stewart)   QML_FILE="stewart/stewart.qml";           FOCUS="title:stewart" ;;
         wallpaper) QML_FILE="wallpaper/WallpaperPicker.qml"; FOCUS="title:wallpaper-picker" ;;
         *) 
             echo "Error: Unknown window '$1'."
@@ -170,16 +170,21 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
     get_qml_info "$TARGET"
     QML_BASE=$(basename "$QML_FILE")
 
-    # If action is 'toggle', check if it's already running
+    # If action is 'toggle', check if it's already running in Hyprland
     if [[ "$ACTION" == "toggle" ]]; then
-        if pgrep -f "quickshell.*$QML_BASE" > /dev/null; then
-            # It's running, so close it and exit
+        # Extract the literal title from the focus string (e.g., 'network-popup' from 'title:network-popup')
+        WIN_TITLE="${FOCUS#title:}"
+        
+        # Check if the window is currently mapped and visible in the WM
+        if hyprctl clients | grep -q "title: $WIN_TITLE$"; then
+            # It is actively open, so close it and exit
             cleanup_all
             exit 0
         fi
     fi
 
     # GLOBAL RESET: Ensure exclusive behavior (only one open at a time)
+    # This also acts as our garbage collector for zombie processes closed via Alt+F4
     cleanup_all
 
     # Run the specific setup and open it
@@ -197,4 +202,3 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
 
     exit 0
 fi
-

@@ -81,8 +81,8 @@
       "float, title:^(calendar_win)$"
       "pin, title:^(calendar_win)$"
       
-      "size 1300 750, title:^(calendar_win)$"
-      "move 310 70, title:^(calendar_win)$"
+      "size 1450 750, title:^(calendar_win)$"
+      "move 235 70, title:^(calendar_win)$"
 
       "float, title:^(stewart)$"
       "pin, title:^(stewart)$"
