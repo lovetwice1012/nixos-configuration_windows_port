@@ -22,8 +22,8 @@ FloatingWindow {
     property bool isWallpaperTransition: false 
 
     // Track the last position to anchor the 1x1 parking dot
-    property int currentX: 0
-    property int currentY: 0
+    property int currentX: -5000
+    property int currentY: -5000
 
     property real animW: 10
     property real animH: 10
@@ -287,7 +287,8 @@ FloatingWindow {
             widgetStack.clear();
             masterWindow.disableMorph = false;
             
-            let cmd = `hyprctl dispatch resizewindowpixel "exact 1 1,title:^(qs-master)$" && hyprctl dispatch movewindowpixel "exact ${currentX} ${currentY},title:^(qs-master)$"`;
+            // Move window completely off-screen using the hidden layout coordinates!
+            let cmd = `hyprctl dispatch resizewindowpixel "exact 1 1,title:^(qs-master)$" && hyprctl dispatch movewindowpixel "exact -5000 -5000,title:^(qs-master)$"`;
             Quickshell.execDetached(["bash", "-c", cmd]);
         }
     }

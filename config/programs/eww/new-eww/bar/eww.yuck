@@ -219,7 +219,7 @@
                       (box :width 10)
 
                       ;; Device Name
-                      (eventbox :onclick "bash ~/.config/hypr/scripts/quickshell/network/launch_network.sh"
+                      (eventbox :onclick "bash ~/.config/hypr/scripts/qs_manager.sh toggle network"
                                 :onrightclick "blueman-manager &"
                                 :cursor "pointer"
                           (label :class "sys-text" 
@@ -418,7 +418,7 @@
          :halign "center" 
          :space-evenly "false"
 
-        (eventbox :onclick "bash ~/.config/hypr/scripts/quickshell/music/toggle_music.sh"
+        (eventbox :onclick "bash ~/.config/hypr/scripts/qs_manager.sh toggle music"
             (box :orientation "h" :spacing 10 :space-evenly "false"
                 ;; Art
                 (box :class "album_art" 

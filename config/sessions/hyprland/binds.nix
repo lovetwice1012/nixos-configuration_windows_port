@@ -54,7 +54,7 @@
 	 "$mainMod, B, exec, bash ~/.config/hypr/scripts/qs_manager.sh toggle battery"
 	 "$mainMod, W, exec, bash ~/.config/hypr/scripts/qs_manager.sh toggle wallpaper"
 	 "$mainMod, S, exec, bash ~/.config/hypr/scripts/qs_manager.sh toggle calendar"
-         "$mainMod, N, exec, ~/.config/hypr/scripts/qs_manager.sh toggle network"
+         "$mainMod, N, exec, bash ~/.config/hypr/scripts/qs_manager.sh toggle network"
 
 
          "$mainMod, F, exec, firefox"

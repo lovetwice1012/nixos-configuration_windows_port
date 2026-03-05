@@ -421,9 +421,20 @@ Item {
                 opacity: (window.currentConn && window.showInfoView && window.currentPower) ? 1.0 : 0.0
                 Behavior on opacity { NumberAnimation { duration: 500 } }
                 
+                // Highly Optimized Timer - 45ms is ~22fps. Gives fluid waves without killing the CPU.
+                Timer {
+                    id: lightningTimer
+                    interval: 45
+                    running: nodeLinesCanvas.opacity > 0.01
+                    repeat: true
+                    onTriggered: nodeLinesCanvas.requestPaint()
+                }
+
                 Connections {
                     target: window
-                    function onGlobalOrbitAngleChanged() { if (window.currentConn && window.showInfoView && window.currentPower) nodeLinesCanvas.requestPaint() }
+                    function onGlobalOrbitAngleChanged() { 
+                        if (window.currentConn && window.showInfoView && window.currentPower) nodeLinesCanvas.requestPaint() 
+                    }
                 }
                 
                 onPaint: {
@@ -431,21 +442,92 @@ Item {
                     ctx.clearRect(0, 0, width, height);
                     if (!window.currentConn || !window.showInfoView || !window.currentPower) return;
                     
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeStyle = window.activeColor;
-                    ctx.globalAlpha = 0.25;
-                    
                     var centerX = width / 2;
                     var centerY = height / 2;
+                    var time = Date.now() / 1000;
                     
+                    ctx.lineJoin = "round";
+                    ctx.lineCap = "round";
+
+                    // Pre-calculate time-based waves outside the loop to save heavy math ops
+                    var tWave1 = time * 2.5;
+                    var tWave2 = time * -1.5;
+
                     for (var i = 0; i < orbitRepeater.count; i++) {
                         var item = orbitRepeater.itemAt(i);
-                        if (item && item.isLoaded) {
-                            ctx.beginPath();
-                            ctx.moveTo(centerX, centerY);
-                            ctx.lineTo(item.x + item.width / 2, item.y + item.height / 2);
-                            ctx.stroke();
+                        if (!item || !item.isLoaded) continue;
+                        
+                        var targetX = item.x + item.width / 2;
+                        var targetY = item.y + item.height / 2;
+                        
+                        var dx = targetX - centerX;
+                        var dy = targetY - centerY;
+                        var fullDist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (fullDist < 10) continue;
+
+                        var alpha = Math.atan2(dy, dx);
+                        var cosA = Math.cos(alpha);
+                        var sinA = Math.sin(alpha);
+                        
+                        // Stop at the border of the card (Ellipse boundary approximation)
+                        var rx = 85; 
+                        var ry = 30; 
+                        var cardEdgeDist = (rx * ry) / Math.sqrt(Math.pow(ry * cosA, 2) + Math.pow(rx * sinA, 2));
+                        var stopDist = fullDist - (cardEdgeDist + 8); 
+                        
+                        if (stopDist <= 0) continue;
+                        
+                        // Optimized step count: Max 12 steps is plenty for a smooth wave. Less math = less lag.
+                        var steps = Math.min(12, Math.max(5, Math.floor(stopDist / 20))); 
+                        
+                        var perpX = -sinA;
+                        var perpY = cosA;
+
+                        // OPTIMIZATION: Removed shadowBlur entirely. Using a "fake glow" double-stroke instead.
+                        
+                        // --- STRAND 1: The Core Math ---
+                        ctx.beginPath();
+                        ctx.moveTo(centerX, centerY);
+                        
+                        for (var j = 1; j <= steps; j++) {
+                            var t = j / steps;
+                            var currentDist = stopDist * t;
+                            var envelope = Math.sin(t * Math.PI);
+                            
+                            var offset = Math.sin(tWave1 + t * 6) * 6 * envelope;
+                            ctx.lineTo(centerX + cosA * currentDist + perpX * offset, centerY + sinA * currentDist + perpY * offset);
                         }
+                        
+                        // First pass: Fake Glow (Thick, highly transparent, perfectly tracks the core)
+                        ctx.lineWidth = 6.0;
+                        ctx.strokeStyle = window.activeColor;
+                        ctx.globalAlpha = 0.15;
+                        ctx.stroke();
+
+                        // Second pass: Solid Core (Thin, white-ish, tracks the exact same path instantly)
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.globalAlpha = 0.9;
+                        ctx.stroke();
+
+                        // --- STRAND 2: Single Wandering Aura ---
+                        ctx.beginPath();
+                        ctx.moveTo(centerX, centerY);
+                        
+                        for (var k = 1; k <= steps; k++) {
+                            var tk = k / steps;
+                            var currentDistK = stopDist * tk;
+                            var envelopeK = Math.sin(tk * Math.PI);
+                            
+                            var offsetK = Math.cos(tWave2 + tk * 8) * 12 * envelopeK;
+                            ctx.lineTo(centerX + cosA * currentDistK + perpX * offsetK, centerY + sinA * currentDistK + perpY * offsetK);
+                        }
+                        
+                        ctx.lineWidth = 2.0;
+                        ctx.strokeStyle = window.activeColor;
+                        ctx.globalAlpha = 0.3;
+                        ctx.stroke();
                     }
                 }
             }
@@ -577,6 +659,7 @@ Item {
                         }
                     }
 
+                    // Soft ambient pulse ring
                     Rectangle {
                         anchors.centerIn: parent
                         width: parent.width + 40
@@ -592,6 +675,35 @@ Item {
                             loops: Animation.Infinite; running: window.currentConn
                             NumberAnimation { to: coreMa.containsMouse ? 1.15 : 1.1; duration: coreMa.containsMouse ? 800 : 2000; easing.type: Easing.InOutSine }
                             NumberAnimation { to: 1.0; duration: coreMa.containsMouse ? 800 : 2000; easing.type: Easing.InOutSine }
+                        }
+                    }
+                    
+                    // --- ELECTRICAL PULSE RING ---
+                    // Optimized along with the canvas. Uses the same 45ms timer baseline
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width + 15
+                        height: width
+                        radius: width / 2
+                        color: "transparent"
+                        border.color: centralCore.isDangerState ? window.red : window.activeColor
+                        border.width: 3
+                        z: -2
+                        
+                        property real pulseOp: 0.0
+                        property real pulseSc: 1.0
+                        opacity: (window.currentConn && window.showInfoView && window.currentPower && window.busyTask !== "DISCONNECTING") ? pulseOp : 0.0
+                        scale: pulseSc
+                        
+                        Timer {
+                            interval: 45
+                            running: parent.opacity > 0.01
+                            repeat: true
+                            onTriggered: {
+                                var time = Date.now() / 1000;
+                                parent.pulseOp = 0.3 + Math.sin(time * 2.5) * 0.15;
+                                parent.pulseSc = 1.02 + Math.cos(time * 3.0) * 0.02;
+                            }
                         }
                     }
 

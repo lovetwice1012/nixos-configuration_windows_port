@@ -23,11 +23,19 @@ Item {
     }
 
     function tryFocus() {
-        if (!initialFocusSet && view.count > 0) {
-            initialFocusSet = true;
-            // Instantly snap the camera and selection to the target without animating
-            view.currentIndex = targetWallIndex;
-            view.positionViewAtIndex(targetWallIndex, ListView.Center);
+        if (!initialFocusSet) {
+            // Wait until the model has loaded enough items to actually reach our target
+            if (view.count > targetWallIndex) {
+                view.currentIndex = targetWallIndex;
+                view.positionViewAtIndex(targetWallIndex, ListView.Center);
+                initialFocusSet = true;
+            } else if (folderModel.status === FolderListModel.Ready && view.count > 0) {
+                // Fallback: If the folder completely finished loading but the index is somehow out of bounds
+                let safeIndex = Math.max(0, view.count - 1);
+                view.currentIndex = safeIndex;
+                view.positionViewAtIndex(safeIndex, ListView.Center);
+                initialFocusSet = true;
+            }
         }
     }
 
@@ -70,7 +78,7 @@ Item {
         preferredHighlightEnd: (width / 2) + (window.itemWidth / 2)
         
         // Reset back to standard speed for snappy manual keyboard navigation
-        highlightMoveDuration: 300
+        highlightMoveDuration: window.initialFocusSet ? 300 : 0
 
         focus: true
         
@@ -82,6 +90,9 @@ Item {
             nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.mp4", "*.mkv", "*.mov", "*.webm"]
             showDirs: false
             sortField: FolderListModel.Name 
+            
+            // Re-check focus when the model's loading status updates
+            onStatusChanged: window.tryFocus()
         }
 
         delegate: Item {

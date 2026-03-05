@@ -101,7 +101,7 @@ Item {
             "cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown'; " +
             "powerprofilesctl get 2>/dev/null || echo 'balanced'; " +
             "awk '{print int($1/3600)\"h \"int(($1%3600)/60)\"m\"}' /proc/uptime 2>/dev/null || echo '0h 0m'; " +
-            "amixer sget Master 2>/dev/null | awk -F'[][]' '/%/ {print $2, $4; exit}' | tr -d '%' || echo '0 on'; " +
+            "wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2*100), ($3==\"[MUTED]\"?\"off\":\"on\")}' || echo '0 on'; " +
             "brightnessctl -m 2>/dev/null | awk -F, '{print substr($4, 1, length($4)-1)}' || echo '0'"
         ]
         running: true
@@ -595,6 +595,18 @@ Item {
                             Item {
                                 Layout.fillWidth: true
                                 height: 18
+                                
+                                Timer {
+                                    id: briCmdThrottle
+                                    interval: 50
+                                    property int targetPct: -1
+                                    onTriggered: {
+                                        if (targetPct >= 0) {
+                                            Quickshell.execDetached(["brightnessctl", "set", targetPct + "%"]);
+                                            targetPct = -1;
+                                        }
+                                    }
+                                }
 
                                 Rectangle {
                                     anchors.fill: parent
@@ -631,7 +643,8 @@ Item {
                                     function updateBri(mx) {
                                         let pct = Math.max(0, Math.min(100, Math.round((mx / width) * 100)));
                                         window.sysBrightness = pct; 
-                                        Quickshell.execDetached(["brightnessctl", "set", pct + "%"]);
+                                        briCmdThrottle.targetPct = pct;
+                                        if (!briCmdThrottle.running) briCmdThrottle.start();
                                     }
                                 }
                             }
@@ -668,7 +681,7 @@ Item {
                                         volSyncDelay.stop();
                                         window.isDraggingVol = true; 
                                         window.sysMuted = !window.sysMuted;
-                                        Quickshell.execDetached(["amixer", "sset", "Master", "toggle"]);
+                                        Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
                                         volSyncDelay.restart();
                                     }
                                 }
@@ -677,6 +690,22 @@ Item {
                             Item {
                                 Layout.fillWidth: true
                                 height: 18
+                                
+                                Timer {
+                                    id: volCmdThrottle
+                                    interval: 50
+                                    property int targetPct: -1
+                                    onTriggered: {
+                                        if (targetPct >= 0) {
+                                            if (targetPct > 0 && window.sysMuted) {
+                                                window.sysMuted = false;
+                                                Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
+                                            }
+                                            Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", targetPct + "%"]);
+                                            targetPct = -1;
+                                        }
+                                    }
+                                }
 
                                 Rectangle {
                                     anchors.fill: parent
@@ -713,11 +742,8 @@ Item {
                                     function updateVol(mx) {
                                         let pct = Math.max(0, Math.min(100, Math.round((mx / width) * 100)));
                                         window.sysVolume = pct;
-                                        if (pct > 0 && window.sysMuted) {
-                                            window.sysMuted = false;
-                                            Quickshell.execDetached(["amixer", "sset", "Master", "unmute"]);
-                                        }
-                                        Quickshell.execDetached(["amixer", "sset", "Master", pct + "%"]);
+                                        volCmdThrottle.targetPct = pct;
+                                        if (!volCmdThrottle.running) volCmdThrottle.start();
                                     }
                                 }
                             }
@@ -882,7 +908,6 @@ Item {
 
                             Timer {
                                 id: exitTimer; interval: 500 
-                                // FIXED: Was onClicked instead of onTriggered
                                 onTriggered: { Quickshell.execDetached(["sh", "-c", cmd]); Quickshell.execDetached(["sh", "-c", "echo 'close' > /tmp/qs_widget_state"]); }
                             }
                         }
