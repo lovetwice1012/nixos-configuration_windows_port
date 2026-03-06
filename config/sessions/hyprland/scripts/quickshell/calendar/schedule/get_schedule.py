@@ -101,7 +101,6 @@ def extract_lessons_from_group(group, date_obj):
         duration_seconds = max(0, duration_seconds)
         minutes = duration_seconds / 60
         width = minutes * PIXELS_PER_MINUTE
-        # CHANGED: Lower divisor (from 7 to 5) allows more characters before cutting off
         char_limit = int(width / 5) 
         return int(width), char_limit
 
@@ -148,8 +147,6 @@ def extract_lessons_from_group(group, date_obj):
 
 def get_valid_day_columns(driver):
     try:
-        # Reduced timeout: if the week is empty (winter break), this will throw Timeout quickly
-        # allowing us to move to the next week loop.
         wait = WebDriverWait(driver, 3)
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "skemaBrikGruppe")))
         groups = driver.find_elements(By.XPATH, "//*[contains(@class, 'DagMedBrikker')]//*[contains(@class, 'skemaBrikGruppe')]/..")
@@ -160,7 +157,7 @@ def get_valid_day_columns(driver):
             return int(match.group(1)) if match else 99999
         return sorted(groups, key=get_x_pos)
     except TimeoutException:
-        return [] # Empty week
+        return [] 
 
 def format_header(date_obj, now):
     delta = (date_obj.date() - now.date()).days
@@ -183,70 +180,59 @@ def update_schedule():
     
     try:
         driver = webdriver.Firefox(options=options)
+        
+        # PREVENT HANGING: Set a 30-second timeout for the page to load
+        driver.set_page_load_timeout(30)
+        
         now = datetime.now()
         
-        # Define end of school day for "today" logic
         end_of_school_today = now.replace(hour=15, minute=40)
         
         search_date = now
         check_today = True
 
-        # If it's past school hours, skip today immediately
         if now > end_of_school_today:
             check_today = False
             search_date = now + timedelta(days=1)
 
-        # --- SEARCH LOOP ---
         found_classes = False
         weeks_checked = 0
         
         while not found_classes and weeks_checked < 6:
-            # 1. Navigate
             current_week_url = get_specific_url(search_date)
             driver.get(current_week_url)
             
-            # 2. CRITICAL FIX: Wait for JS to render the new week
-            # Without this, Selenium grabs the OLD week (cached) instantly.
             time.sleep(2.5) 
             
-            # 3. Scrape
             day_columns = get_valid_day_columns(driver)
             
             if day_columns:
                 start_weekday_idx = search_date.weekday() 
                 
                 for day_idx in range(len(day_columns)):
-                    # Calculate the real date of this column
                     monday_of_week = search_date - timedelta(days=search_date.weekday())
                     target_date = monday_of_week + timedelta(days=day_idx)
                     
-                    # Skip days we've already passed in previous loops/logic
                     if target_date.date() < search_date.date():
                         continue
                         
-                    # Skip today if we marked it as "done" (check_today=False)
                     if target_date.date() == now.date() and not check_today:
                         continue
                         
-                    # Skip weekends
                     if target_date.weekday() > 4: 
                         continue
 
                     lessons = extract_lessons_from_group(day_columns[day_idx], target_date)
                     
-                    # If it's today, ensure the lessons haven't already finished
                     if target_date.date() == now.date():
                         if not lessons: continue
-                        # Check end time of the actual last CLASS, not just a gap
                         real_classes = [l for l in lessons if l['type'] == 'class']
                         if not real_classes: continue
                         if now.timestamp() > real_classes[-1]['end']: continue
 
-                    # LOGIC FIX: Only accept this day if it has ACTUAL classes, not just gaps
                     has_real_classes = any(l.get('type') == 'class' for l in lessons)
 
                     if lessons and has_real_classes:
-                        # FOUND IT!
                         output["lessons"] = lessons
                         output["header"] = format_header(target_date, now)
                         output["link"] = current_week_url
@@ -254,10 +240,9 @@ def update_schedule():
                         break
             
             if not found_classes:
-                # Prepare for next loop: Jump to Next Monday
                 days_ahead = 7 - search_date.weekday()
                 search_date = search_date + timedelta(days=days_ahead)
-                check_today = True # Future dates are always valid to check
+                check_today = True 
                 weeks_checked += 1
 
     except Exception as e:

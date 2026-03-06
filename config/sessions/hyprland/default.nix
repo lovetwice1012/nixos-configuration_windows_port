@@ -32,6 +32,7 @@
     cava
     cliphist
     hyprlock
+    tree
   ];
 
   wayland.windowManager.hyprland.settings = {

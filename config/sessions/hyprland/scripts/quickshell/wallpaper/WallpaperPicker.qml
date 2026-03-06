@@ -170,7 +170,7 @@ Item {
 
                     Image {
                         anchors.centerIn: parent
-                        anchors.horizontalCenterOffset: -35 
+                        anchors.horizontalCenterOffset: -50 
                         
                         width: parent.width + (parent.height * Math.abs(window.skewFactor)) + 50
                         height: parent.height

@@ -12,6 +12,11 @@ SHELL_NIX="$HOME/.config/hypr/scripts/quickshell/calendar/schedule/shell.nix"
 mkdir -p "$CACHE_DIR"
 
 trigger_update() {
+    # PREVENT OVERLAP: Check if the python script is already running
+    if pgrep -f "python3.*get_schedule.py" > /dev/null; then
+        return # Silently exit if an update is already in progress
+    fi
+    
     nix-shell "$SHELL_NIX" --run "python3 '$UPDATER_SCRIPT'" >/dev/null 2>&1 &
 }
 

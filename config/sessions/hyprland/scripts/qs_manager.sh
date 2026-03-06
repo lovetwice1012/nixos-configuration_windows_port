@@ -79,24 +79,27 @@ handle_network_prep() {
 }
 
 # -----------------------------------------------------------------------------
-# ENSURE MASTER WINDOW IS ALIVE (ZOMBIE WATCHDOG)
+# ENSURE MASTER WINDOW & TOP BAR ARE ALIVE (ZOMBIE WATCHDOG)
 # -----------------------------------------------------------------------------
 QS_PID=$(pgrep -f "quickshell.*Main\.qml")
-# Check if Hyprland actually sees the window surface
 WIN_EXISTS=$(hyprctl clients -j | grep "qs-master")
 
+BAR_PID=$(pgrep -f "quickshell.*TopBar\.qml")
+
+# 1. Manage the Master morphing window
 if [[ -z "$QS_PID" ]] || [[ -z "$WIN_EXISTS" ]]; then
-    # If the process is alive but the window is dead, kill the zombie
     if [[ -n "$QS_PID" ]]; then
         kill -9 $QS_PID 2>/dev/null
     fi
-    
-    # Boot a fresh master QML window safely
     quickshell -p "$QS_DIR/Main.qml" >/dev/null 2>&1 &
     disown
-    
-    # Give Wayland a moment to map the new surface
     sleep 0.6 
+fi
+
+# 2. Manage the persistent Top Bar
+if [[ -z "$BAR_PID" ]]; then
+    quickshell -p "$QS_DIR/TopBar.qml" >/dev/null 2>&1 &
+    disown
 fi
 
 # -----------------------------------------------------------------------------
@@ -132,7 +135,6 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
         echo "$TARGET" > "$IPC_FILE"
     elif [[ "$TARGET" == "wallpaper" ]]; then
         handle_wallpaper_prep
-        # Pass the index directly via IPC!
         echo "$TARGET:$WALLPAPER_INDEX" > "$IPC_FILE"
     else
         echo "$TARGET" > "$IPC_FILE"

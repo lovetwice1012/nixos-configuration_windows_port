@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import QtCore
 import Quickshell
 import Quickshell.Io
@@ -64,6 +65,7 @@ Item {
     property string busyTask: ""
     Timer { id: busyTimeout; interval: 15000; onTriggered: window.busyTask = "" }
 
+    // Fallback timers in case daemon completely hangs
     Timer { id: wifiPendingReset; interval: 8000; onTriggered: { window.wifiPowerPending = false; window.expectedWifiPower = ""; } }
     Timer { id: btPendingReset; interval: 8000; onTriggered: { window.btPowerPending = false; window.expectedBtPower = ""; } }
 
@@ -197,19 +199,19 @@ Item {
     function processWifiJson(textData) {
         if (textData === "") return;
         try {
-            let data = JSON.parse(textData)
-            let fetchedPower = data.power || "off"
+            let data = JSON.parse(textData);
+            let fetchedPower = data.power || "off";
             
-            if (window.expectedWifiPower !== "") {
-                if (fetchedPower === window.expectedWifiPower) { 
-                    window.wifiPower = fetchedPower;
-                    window.wifiPowerPending = false; 
-                    window.expectedWifiPower = ""; 
-                    wifiPendingReset.stop(); 
+            // STRICT STATE LOCK: Ignore daemon chatter until it confirms our action
+            if (window.wifiPowerPending) {
+                window.wifiPower = window.expectedWifiPower; // Force optimistic state
+                if (fetchedPower === window.expectedWifiPower) {
+                    window.wifiPowerPending = false; // Daemon caught up! Lock released.
+                    wifiPendingReset.stop();
                 }
-            } else { 
+            } else {
                 window.wifiPower = fetchedPower;
-                window.wifiPowerPending = false; 
+                window.expectedWifiPower = "";
             }
 
             let newConnected = data.connected;
@@ -251,19 +253,19 @@ Item {
     function processBtJson(textData) {
         if (textData === "") return;
         try {
-            let data = JSON.parse(textData)
-            let fetchedPower = data.power || "off"
+            let data = JSON.parse(textData);
+            let fetchedPower = data.power || "off";
             
-            if (window.expectedBtPower !== "") {
-                if (fetchedPower === window.expectedBtPower) { 
-                    window.btPower = fetchedPower;
-                    window.btPowerPending = false; 
-                    window.expectedBtPower = ""; 
-                    btPendingReset.stop(); 
+            // STRICT STATE LOCK: Ignore daemon chatter until it confirms our action
+            if (window.btPowerPending) {
+                window.btPower = window.expectedBtPower; // Force optimistic state
+                if (fetchedPower === window.expectedBtPower) {
+                    window.btPowerPending = false; // Daemon caught up! Lock released.
+                    btPendingReset.stop();
                 }
-            } else { 
+            } else {
                 window.btPower = fetchedPower;
-                window.btPowerPending = false; 
+                window.expectedBtPower = "";
             }
 
             let newBtConnected = data.connected;
@@ -390,7 +392,9 @@ Item {
                 anchors.fill: parent
                 anchors.bottomMargin: 80 
                 opacity: window.currentPower ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
+                scale: window.currentPower ? 1.0 : 1.05
+                Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
+                Behavior on scale { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
                 
                 Repeater {
                     model: 3
@@ -421,11 +425,11 @@ Item {
                 opacity: (window.currentConn && window.showInfoView && window.currentPower) ? 1.0 : 0.0
                 Behavior on opacity { NumberAnimation { duration: 500 } }
                 
-                // Highly Optimized Timer - 45ms is ~22fps. Gives fluid waves without killing the CPU.
                 Timer {
                     id: lightningTimer
                     interval: 45
-                    running: nodeLinesCanvas.opacity > 0.01
+                    // Immediately stops ticking when power is off to save resources during the fade animation
+                    running: nodeLinesCanvas.opacity > 0.01 && window.currentPower 
                     repeat: true
                     onTriggered: nodeLinesCanvas.requestPaint()
                 }
@@ -449,7 +453,6 @@ Item {
                     ctx.lineJoin = "round";
                     ctx.lineCap = "round";
 
-                    // Pre-calculate time-based waves outside the loop to save heavy math ops
                     var tWave1 = time * 2.5;
                     var tWave2 = time * -1.5;
 
@@ -470,7 +473,6 @@ Item {
                         var cosA = Math.cos(alpha);
                         var sinA = Math.sin(alpha);
                         
-                        // Stop at the border of the card (Ellipse boundary approximation)
                         var rx = 85; 
                         var ry = 30; 
                         var cardEdgeDist = (rx * ry) / Math.sqrt(Math.pow(ry * cosA, 2) + Math.pow(rx * sinA, 2));
@@ -478,14 +480,16 @@ Item {
                         
                         if (stopDist <= 0) continue;
                         
-                        // Optimized step count: Max 12 steps is plenty for a smooth wave. Less math = less lag.
-                        var steps = Math.min(12, Math.max(5, Math.floor(stopDist / 20))); 
+                        var steps = Math.min(10, Math.max(5, Math.floor(stopDist / 20))); 
                         
                         var perpX = -sinA;
                         var perpY = cosA;
 
-                        // OPTIMIZATION: Removed shadowBlur entirely. Using a "fake glow" double-stroke instead.
-                        
+                        var distanceFactor = Math.max(0, 1.0 - (fullDist / 400.0));
+                        var dynamicLineWidthCore = 1.0 + (distanceFactor * 2.0);
+                        var dynamicLineWidthGlow = 4.0 + (distanceFactor * 4.0);
+                        var dynamicAlpha = 0.2 + (distanceFactor * 0.7);
+
                         // --- STRAND 1: The Core Math ---
                         ctx.beginPath();
                         ctx.moveTo(centerX, centerY);
@@ -495,20 +499,22 @@ Item {
                             var currentDist = stopDist * t;
                             var envelope = Math.sin(t * Math.PI);
                             
-                            var offset = Math.sin(tWave1 + t * 6) * 6 * envelope;
+                            var noiseJitter = (Math.random() - 0.5) * 5.0 * distanceFactor;
+                            var offset = Math.sin(tWave1 + t * 6) * 6 * envelope + noiseJitter;
+                            
                             ctx.lineTo(centerX + cosA * currentDist + perpX * offset, centerY + sinA * currentDist + perpY * offset);
                         }
                         
-                        // First pass: Fake Glow (Thick, highly transparent, perfectly tracks the core)
-                        ctx.lineWidth = 6.0;
+                        // Pass 1: Fake Glow
+                        ctx.lineWidth = dynamicLineWidthGlow;
                         ctx.strokeStyle = window.activeColor;
-                        ctx.globalAlpha = 0.15;
+                        ctx.globalAlpha = dynamicAlpha * 0.15;
                         ctx.stroke();
 
-                        // Second pass: Solid Core (Thin, white-ish, tracks the exact same path instantly)
-                        ctx.lineWidth = 1.5;
+                        // Pass 2: Solid Core
+                        ctx.lineWidth = dynamicLineWidthCore;
                         ctx.strokeStyle = "#ffffff";
-                        ctx.globalAlpha = 0.9;
+                        ctx.globalAlpha = dynamicAlpha;
                         ctx.stroke();
 
                         // --- STRAND 2: Single Wandering Aura ---
@@ -520,13 +526,15 @@ Item {
                             var currentDistK = stopDist * tk;
                             var envelopeK = Math.sin(tk * Math.PI);
                             
-                            var offsetK = Math.cos(tWave2 + tk * 8) * 12 * envelopeK;
+                            var noiseJitterK = (Math.random() - 0.5) * 3.0 * distanceFactor;
+                            var offsetK = Math.cos(tWave2 + tk * 8) * 12 * envelopeK + noiseJitterK;
+                            
                             ctx.lineTo(centerX + cosA * currentDistK + perpX * offsetK, centerY + sinA * currentDistK + perpY * offsetK);
                         }
                         
-                        ctx.lineWidth = 2.0;
+                        ctx.lineWidth = dynamicLineWidthCore * 1.5;
                         ctx.strokeStyle = window.activeColor;
-                        ctx.globalAlpha = 0.3;
+                        ctx.globalAlpha = dynamicAlpha * 0.3;
                         ctx.stroke();
                     }
                 }
@@ -537,6 +545,19 @@ Item {
                 anchors.fill: parent
                 anchors.bottomMargin: 80 
                 z: 1
+
+                MultiEffect {
+                    source: centralCore
+                    anchors.fill: centralCore
+                    shadowEnabled: true
+                    shadowColor: "#000000"
+                    shadowOpacity: window.currentPower ? 0.5 : 0.0
+                    shadowBlur: 1.2
+                    shadowVerticalOffset: 6
+                    shadowHorizontalOffset: 0
+                    Behavior on shadowOpacity { NumberAnimation { duration: 600 } }
+                    z: -1
+                }
 
                 // --- THE CENTRAL CORE ---
                 Rectangle {
@@ -659,7 +680,6 @@ Item {
                         }
                     }
 
-                    // Soft ambient pulse ring
                     Rectangle {
                         anchors.centerIn: parent
                         width: parent.width + 40
@@ -678,8 +698,6 @@ Item {
                         }
                     }
                     
-                    // --- ELECTRICAL PULSE RING ---
-                    // Optimized along with the canvas. Uses the same 45ms timer baseline
                     Rectangle {
                         anchors.centerIn: parent
                         width: parent.width + 15
@@ -728,7 +746,9 @@ Item {
                                 Layout.alignment: Qt.AlignHCenter
                                 font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 14
                                 color: window.overlay0
-                                text: !window.currentPower ? "Radio Offline" : "Scanning..."
+                                text: window.currentPowerPending 
+                                    ? ((window.activeMode === "wifi" ? window.expectedWifiPower : window.expectedBtPower) === "on" ? "Powering On..." : "Powering Off...") 
+                                    : (!window.currentPower ? "Radio Offline" : "Scanning...")
                             }
                         }
 
@@ -833,57 +853,53 @@ Item {
                 Item {
                     anchors.fill: parent
                     opacity: window.currentPower ? 1.0 : 0.0
-                    scale: window.currentPower ? 1.0 : 0.5
-                    Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                    Behavior on scale { NumberAnimation { duration: 600; easing.type: Easing.OutBack } }
+                    Behavior on opacity { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
 
                     Repeater {
                         id: orbitRepeater
                         model: (window.currentConn && window.showInfoView) ? infoListModel : (window.activeMode === "wifi" ? wifiListModel : btListModel)
                         
-                        delegate: Rectangle {
-                            id: floatCard
+                        delegate: Item {
+                            id: floatCardDelegateContainer
                             width: 170; height: 60
-                            radius: 16
-                            
-                            property string itemId: id
-                            property string itemName: name
-                            property bool isMyBusy: window.busyTask === itemId
-                            property bool isPairedBT: window.activeMode === "bt" && action === "Connect"
-                            property bool isTargetWifi: window.activeMode === "wifi" && !window.isWifiConn && itemId === window.targetWifiSsid
-                            property bool isSpecialAction: itemId === "action_scan" || itemId === "action_settings"
-                            property bool isHighlighted: isPairedBT || isTargetWifi || isSpecialAction
-                            
-                            property bool isCurrentlyConnected: (window.activeMode === "wifi" ? (window.wifiConnected && window.wifiConnected.ssid === itemId) : (window.btConnected && window.btConnected.mac === itemId))
-                            
-                            property bool isInteractable: !isInfoNode || isActionable
-                            property bool locksList: isInteractable && (floatMa.containsMouse || floatMa.pressed)
-                            onLocksListChanged: { if (locksList) window.hoveredCardCount++; else window.hoveredCardCount--; }
-                            Component.onDestruction: { if (locksList) window.hoveredCardCount--; }
+
+                            property bool isLoaded: false
+                            // Smooth cascading fade-in on initial spawn! 
+                            opacity: isLoaded ? 1.0 : 0.0
+                            Behavior on opacity { NumberAnimation { duration: 700; easing.type: Easing.OutQuint } }
+
+                            Timer {
+                                running: true
+                                interval: 10 + (index * 30) // Gentle delay based on list position
+                                onTriggered: floatCardDelegateContainer.isLoaded = true
+                            }
 
                             property int activeCount: orbitRepeater.count
                             property real dynamicScale: activeCount > 10 ? Math.max(0.75, 12.0 / activeCount) : 1.0
                             
                             property real baseAngle: activeCount > 0 ? (index / activeCount) * Math.PI * 2 : 0
                             Behavior on baseAngle { NumberAnimation { duration: 1000; easing.type: Easing.OutBack; easing.overshoot: 0.5 } }
-                            property real liveAngle: window.globalOrbitAngle + baseAngle
+                            
+                            property real staggerPhase: Math.sin(window.globalOrbitAngle * 0.5 + index) * 0.3
+                            property real liveAngle: window.globalOrbitAngle + baseAngle + staggerPhase
                             
                             property real currentRadiusX: isInfoNode ? 300 : 290 + (Math.min(activeCount, 20) * 3)
                             property real currentRadiusY: isInfoNode ? 200 : 195 + (Math.min(activeCount, 20) * 2.5)
 
-                            property bool isLoaded: false
                             property real animRadiusX: isLoaded ? currentRadiusX : 0
                             property real animRadiusY: isLoaded ? currentRadiusY : 0
 
                             Behavior on animRadiusX { NumberAnimation { duration: 1200; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
                             Behavior on animRadiusY { NumberAnimation { duration: 1200; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
 
-                            property real targetX: (orbitContainer.width / 2 - width / 2) + Math.cos(liveAngle) * animRadiusX
-                            property real targetY: (orbitContainer.height / 2 - height / 2) + Math.sin(liveAngle) * animRadiusY
+                            property real powerStateDrift: window.currentPower ? 0 : 40
+                            Behavior on powerStateDrift { NumberAnimation { duration: 800; easing.type: Easing.OutQuint } }
+
+                            property real targetX: (orbitContainer.width / 2 - width / 2) + Math.cos(liveAngle) * (animRadiusX + powerStateDrift)
+                            property real targetY: (orbitContainer.height / 2 - height / 2) + Math.sin(liveAngle) * (animRadiusY + powerStateDrift)
 
                             property real bobOffset: 0
                             SequentialAnimation on bobOffset {
-                                id: bobAnim
                                 loops: Animation.Infinite; running: true
                                 PauseAnimation { duration: (index % 5) * 200 }
                                 NumberAnimation { from: 0; to: -15; duration: 2000; easing.type: Easing.InOutSine }
@@ -893,349 +909,374 @@ Item {
                             x: targetX
                             y: targetY + bobOffset
 
-                            Component.onCompleted: isLoaded = true
-                            
-                            opacity: isLoaded ? 1.0 : 0.0
-                            Behavior on opacity { NumberAnimation { duration: 500 } }
-                            
-                            property real bumpScale: 1.0
-                            SequentialAnimation on bumpScale {
-                                id: cardBumpAnim
-                                running: false
-                                NumberAnimation { to: 1.2; duration: 150; easing.type: Easing.OutBack }
-                                NumberAnimation { to: 1.0; duration: 400; easing.type: Easing.OutQuint }
-                            }
-                            scale: (!isLoaded ? 0.0 : (floatMa.pressed ? dynamicScale * 0.95 : (locksList ? dynamicScale * 1.08 : dynamicScale))) * bumpScale
+                            scale: (!isLoaded ? 0.0 : (floatMa.pressed ? dynamicScale * 0.95 : (floatCard.locksList ? dynamicScale * 1.08 : dynamicScale))) * floatCard.bumpScale
                             Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
-                            
-                            z: locksList ? 10 : index
+                            z: floatCard.locksList ? 10 : index
 
-                            property real nameImplicitWidth: baseNameText.implicitWidth
-                            property real nameContainerWidth: nameContainerBase.width
-                            property bool doMarquee: floatMa.containsMouse && nameImplicitWidth > nameContainerWidth
-                            property real textOffset: 0
-
-                            SequentialAnimation on textOffset {
-                                running: floatCard.doMarquee
-                                loops: Animation.Infinite
-                                PauseAnimation { duration: 600 } 
-                                NumberAnimation {
-                                    from: 0
-                                    to: -(floatCard.nameImplicitWidth + 30)
-                                    duration: (floatCard.nameImplicitWidth + 30) * 35
-                                }
-                            }
-                            onDoMarqueeChanged: if (!doMarquee) textOffset = 0;
-
-                            // -------------------------------------------------------------------------
-                            // HOLD TO EXECUTE STATE
-                            // -------------------------------------------------------------------------
-                            property real fillLevel: 0.0
-                            property bool triggered: false
-                            property real flashOpacity: 0.0
-                            
-                            property real renderFill: (isCurrentlyConnected) ? 1.0 : fillLevel
-                            
-                            onIsMyBusyChanged: {
-                                if (!isMyBusy && triggered) {
-                                    triggered = false;
-                                    if (!floatCard.isCurrentlyConnected) drainAnim.start();
-                                }
-                            }
-                            
-                            onIsCurrentlyConnectedChanged: {
-                                if (!isCurrentlyConnected && fillLevel > 0) drainAnim.start();
-                            }
-
-                            color: locksList ? "#1affffff" : "#0dffffff"
-                            Behavior on color { ColorAnimation { duration: 200 } }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 16
-                                color: "transparent"
-                                border.width: 1
-                                border.color: window.surface2
-                                visible: !isHighlighted && !locksList
-                            }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 16
-                                opacity: locksList || isHighlighted ? 1.0 : 0.0
-                                color: "transparent"
-                                border.width: isHighlighted && !locksList ? 1 : 2
-                                Behavior on opacity { NumberAnimation { duration: 250 } }
-                                
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: isHighlighted && !locksList ? 1 : 2
-                                    radius: 14
-                                    color: window.base
-                                    opacity: locksList ? 0.9 : 1.0
-                                }
-                                
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: window.activeColor }
-                                    GradientStop { position: 1.0; color: window.activeGradientSecondary }
-                                }
+                            MultiEffect {
+                                source: floatCard
+                                anchors.fill: floatCard
+                                // Prevent black flash by completely disabling shadow until opacity reveals it
+                                shadowEnabled: window.currentPower && floatCardDelegateContainer.opacity > 0.05
+                                shadowColor: "#000000"
+                                shadowOpacity: 0.3
+                                shadowBlur: 0.8
+                                shadowVerticalOffset: 4
                                 z: -1
                             }
 
                             Rectangle {
+                                id: floatCard
                                 anchors.fill: parent
                                 radius: 16
-                                color: "#ffffff"
-                                opacity: floatCard.flashOpacity
-                                PropertyAnimation on opacity { id: cardFlashAnim; to: 0; duration: 500; easing.type: Easing.OutExpo }
-                                z: 5
-                            }
+                                
+                                property string itemId: id
+                                property string itemName: name
+                                property bool isMyBusy: window.busyTask === itemId
+                                property bool isPairedBT: window.activeMode === "bt" && action === "Connect"
+                                property bool isTargetWifi: window.activeMode === "wifi" && !window.isWifiConn && itemId === window.targetWifiSsid
+                                property bool isSpecialAction: itemId === "action_scan" || itemId === "action_settings"
+                                property bool isHighlighted: isPairedBT || isTargetWifi || isSpecialAction
+                                
+                                property bool isCurrentlyConnected: (window.activeMode === "wifi" ? (window.wifiConnected && window.wifiConnected.ssid === itemId) : (window.btConnected && window.btConnected.mac === itemId))
+                                
+                                property bool isInteractable: !isInfoNode || isActionable
+                                property bool locksList: isInteractable && (floatMa.containsMouse || floatMa.pressed)
+                                onLocksListChanged: { if (locksList) window.hoveredCardCount++; else window.hoveredCardCount--; }
+                                Component.onDestruction: { if (locksList) window.hoveredCardCount--; }
+                                
+                                property real bumpScale: 1.0
+                                SequentialAnimation on bumpScale {
+                                    id: cardBumpAnim
+                                    running: false
+                                    NumberAnimation { to: 1.2; duration: 150; easing.type: Easing.OutBack }
+                                    NumberAnimation { to: 1.0; duration: 400; easing.type: Easing.OutQuint }
+                                }
 
-                            Canvas {
-                                id: waveCanvas
-                                anchors.fill: parent
-                                
-                                property real wavePhase: 0.0
-                                
-                                NumberAnimation on wavePhase {
-                                    running: floatCard.renderFill > 0.0 && floatCard.renderFill < 1.0
+                                property real nameImplicitWidth: baseNameText.implicitWidth
+                                property real nameContainerWidth: nameContainerBase.width
+                                property bool doMarquee: floatMa.containsMouse && nameImplicitWidth > nameContainerWidth
+                                property real textOffset: 0
+
+                                SequentialAnimation on textOffset {
+                                    running: floatCard.doMarquee
                                     loops: Animation.Infinite
-                                    from: 0; to: Math.PI * 2
-                                    duration: 800
-                                }
-
-                                onWavePhaseChanged: requestPaint()
-                                Connections { target: floatCard; function onRenderFillChanged() { waveCanvas.requestPaint() } }
-
-                                onPaint: {
-                                    var ctx = getContext("2d");
-                                    ctx.clearRect(0, 0, width, height);
-                                    if (floatCard.renderFill <= 0.001) return;
-
-                                    var currentW = width * floatCard.renderFill;
-                                    var r = 16; 
-
-                                    ctx.save();
-                                    ctx.beginPath();
-                                    ctx.moveTo(0, 0);
-                                    
-                                    if (floatCard.renderFill < 0.99) {
-                                        var waveAmp = 12 * Math.sin(floatCard.renderFill * Math.PI); 
-                                        if (currentW - waveAmp < 0) waveAmp = currentW;
-                                        var cp1x = currentW + Math.sin(wavePhase) * waveAmp;
-                                        var cp2x = currentW + Math.cos(wavePhase + Math.PI) * waveAmp;
-
-                                        ctx.lineTo(currentW, 0);
-                                        ctx.bezierCurveTo(cp2x, height * 0.33, cp1x, height * 0.66, currentW, height);
-                                        ctx.lineTo(0, height);
-                                    } else {
-                                        ctx.lineTo(width, 0);
-                                        ctx.lineTo(width, height);
-                                        ctx.lineTo(0, height);
+                                    PauseAnimation { duration: 600 } 
+                                    NumberAnimation {
+                                        from: 0
+                                        to: -(floatCard.nameImplicitWidth + 30)
+                                        duration: (floatCard.nameImplicitWidth + 30) * 35
                                     }
-                                    ctx.closePath();
-                                    ctx.clip(); 
-
-                                    ctx.beginPath();
-                                    ctx.moveTo(r, 0);
-                                    ctx.lineTo(width - r, 0);
-                                    ctx.arcTo(width, 0, width, r, r);
-                                    ctx.lineTo(width, height - r);
-                                    ctx.arcTo(width, height, width - r, height, r);
-                                    ctx.lineTo(r, height);
-                                    ctx.arcTo(0, height, 0, height - r, r);
-                                    ctx.lineTo(0, r);
-                                    ctx.arcTo(0, 0, r, 0, r);
-                                    ctx.closePath();
-
-                                    var grad = ctx.createLinearGradient(0, 0, currentW, 0);
-                                    grad.addColorStop(0, window.activeColor);
-                                    grad.addColorStop(1, window.activeGradientSecondary);
-                                    ctx.fillStyle = grad;
-                                    ctx.fill();
-
-                                    ctx.restore();
                                 }
-                            }
+                                onDoMarqueeChanged: if (!doMarquee) textOffset = 0;
 
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: parent.radius
-                                color: "transparent"
-                                border.color: window.activeColor
-                                border.width: 2
-                                visible: parent.isHighlighted && !parent.isMyBusy && !parent.isCurrentlyConnected
+                                property real fillLevel: 0.0
+                                property bool triggered: false
+                                property real flashOpacity: 0.0
                                 
-                                SequentialAnimation on scale {
-                                    loops: Animation.Infinite; running: parent.visible
-                                    NumberAnimation { to: 1.15; duration: 1200; easing.type: Easing.InOutSine }
-                                    NumberAnimation { to: 1.0; duration: 1200; easing.type: Easing.InOutSine }
-                                }
-                                SequentialAnimation on opacity {
-                                    loops: Animation.Infinite; running: parent.visible
-                                    NumberAnimation { to: 0.0; duration: 1200; easing.type: Easing.InOutSine }
-                                    NumberAnimation { to: 0.8; duration: 1200; easing.type: Easing.InOutSine }
-                                }
-                            }
-
-                            RowLayout {
-                                id: baseTextRow
-                                anchors.fill: parent
-                                anchors.margins: 12
-                                spacing: 10
+                                property real renderFill: (isCurrentlyConnected) ? 1.0 : fillLevel
                                 
-                                Text {
-                                    font.family: "Iosevka Nerd Font"
-                                    font.pixelSize: 20
-                                    color: floatCard.isMyBusy ? window.text : window.activeColor
-                                    text: icon
-                                    Behavior on color { ColorAnimation { duration: 200 } }
+                                onIsMyBusyChanged: {
+                                    if (!isMyBusy && triggered) {
+                                        triggered = false;
+                                        if (!floatCard.isCurrentlyConnected) drainAnim.start();
+                                    }
                                 }
                                 
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
+                                onIsCurrentlyConnectedChanged: {
+                                    if (!isCurrentlyConnected && fillLevel > 0) drainAnim.start();
+                                }
+
+                                color: locksList ? "#2affffff" : "#0effffff"
+                                Behavior on color { ColorAnimation { duration: 200 } }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 16
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: window.surface2
+                                    visible: !isHighlighted && !locksList
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 16
+                                    opacity: locksList || isHighlighted ? 1.0 : 0.0
+                                    color: "transparent"
+                                    border.width: isHighlighted && !locksList ? 1 : 2
+                                    Behavior on opacity { NumberAnimation { duration: 250 } }
                                     
-                                    Item {
-                                        id: nameContainerBase
-                                        Layout.fillWidth: true
-                                        height: 18
-                                        clip: true
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.margins: isHighlighted && !locksList ? 1 : 2
+                                        radius: 14
+                                        color: window.base
+                                        opacity: locksList ? 0.9 : 1.0
+                                    }
+                                    
+                                    gradient: Gradient {
+                                        orientation: Gradient.Horizontal
+                                        GradientStop { position: 0.0; color: window.activeColor }
+                                        GradientStop { position: 1.0; color: window.activeGradientSecondary }
+                                    }
+                                    z: -1
+                                }
 
-                                        Row {
-                                            x: floatCard.textOffset
-                                            spacing: 30
-                                            Text {
-                                                id: baseNameText
-                                                text: floatCard.itemName
-                                                font.family: "JetBrains Mono"
-                                                font.weight: Font.Bold
-                                                font.pixelSize: 13
-                                                color: floatCard.isHighlighted ? window.activeColor : window.text
-                                            }
-                                            Text {
-                                                visible: floatCard.doMarquee
-                                                text: floatCard.itemName
-                                                font.family: "JetBrains Mono"
-                                                font.weight: Font.Bold
-                                                font.pixelSize: 13
-                                                color: floatCard.isHighlighted ? window.activeColor : window.text
-                                            }
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 16
+                                    color: "#ffffff"
+                                    opacity: floatCard.flashOpacity
+                                    PropertyAnimation on opacity { id: cardFlashAnim; to: 0; duration: 500; easing.type: Easing.OutExpo }
+                                    z: 5
+                                }
+
+                                Canvas {
+                                    id: waveCanvas
+                                    anchors.fill: parent
+                                    
+                                    property real wavePhase: 0.0
+                                    
+                                    NumberAnimation on wavePhase {
+                                        running: floatCard.renderFill > 0.0 && floatCard.renderFill < 1.0
+                                        loops: Animation.Infinite
+                                        from: 0; to: Math.PI * 2
+                                        duration: 800
+                                    }
+
+                                    onWavePhaseChanged: requestPaint()
+                                    Connections { target: floatCard; function onRenderFillChanged() { waveCanvas.requestPaint() } }
+
+                                    onPaint: {
+                                        var ctx = getContext("2d");
+                                        ctx.clearRect(0, 0, width, height);
+                                        if (floatCard.renderFill <= 0.001) return;
+
+                                        var currentW = width * floatCard.renderFill;
+                                        var r = 16; 
+
+                                        ctx.save();
+                                        ctx.beginPath();
+                                        ctx.moveTo(0, 0);
+                                        
+                                        if (floatCard.renderFill < 0.99) {
+                                            var waveAmp = 12 * Math.sin(floatCard.renderFill * Math.PI); 
+                                            if (currentW - waveAmp < 0) waveAmp = currentW;
+                                            var cp1x = currentW + Math.sin(wavePhase) * waveAmp;
+                                            var cp2x = currentW + Math.cos(wavePhase + Math.PI) * waveAmp;
+
+                                            ctx.lineTo(currentW, 0);
+                                            ctx.bezierCurveTo(cp2x, height * 0.33, cp1x, height * 0.66, currentW, height);
+                                            ctx.lineTo(0, height);
+                                        } else {
+                                            ctx.lineTo(width, 0);
+                                            ctx.lineTo(width, height);
+                                            ctx.lineTo(0, height);
                                         }
-                                    }
-                                    
-                                    Text {
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: 10
-                                        color: floatCard.isMyBusy ? window.activeColor : window.overlay0
-                                        text: floatCard.isMyBusy ? "Connecting..." : (floatCard.renderFill > 0.1 && floatCard.renderFill < 1.0 ? "Hold..." : action)
-                                        Behavior on color { ColorAnimation { duration: 200 } }
+                                        ctx.closePath();
+                                        ctx.clip(); 
+
+                                        ctx.beginPath();
+                                        ctx.moveTo(r, 0);
+                                        ctx.lineTo(width - r, 0);
+                                        ctx.arcTo(width, 0, width, r, r);
+                                        ctx.lineTo(width, height - r);
+                                        ctx.arcTo(width, height, width - r, height, r);
+                                        ctx.lineTo(r, height);
+                                        ctx.arcTo(0, height, 0, height - r, r);
+                                        ctx.lineTo(0, r);
+                                        ctx.arcTo(0, 0, r, 0, r);
+                                        ctx.closePath();
+
+                                        var grad = ctx.createLinearGradient(0, 0, currentW, 0);
+                                        grad.addColorStop(0, window.activeColor);
+                                        grad.addColorStop(1, window.activeGradientSecondary);
+                                        ctx.fillStyle = grad;
+                                        ctx.fill();
+
+                                        ctx.restore();
                                     }
                                 }
-                            }
 
-                            Item {
-                                anchors.left: parent.left
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                width: floatCard.width * floatCard.renderFill
-                                clip: true
-                                
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: parent.radius
+                                    color: "transparent"
+                                    border.color: window.activeColor
+                                    border.width: 2
+                                    visible: parent.isHighlighted && !parent.isMyBusy && !parent.isCurrentlyConnected
+                                    
+                                    SequentialAnimation on scale {
+                                        loops: Animation.Infinite; running: parent.visible
+                                        NumberAnimation { to: 1.15; duration: 1200; easing.type: Easing.InOutSine }
+                                        NumberAnimation { to: 1.0; duration: 1200; easing.type: Easing.InOutSine }
+                                    }
+                                    SequentialAnimation on opacity {
+                                        loops: Animation.Infinite; running: parent.visible
+                                        NumberAnimation { to: 0.0; duration: 1200; easing.type: Easing.InOutSine }
+                                        NumberAnimation { to: 0.8; duration: 1200; easing.type: Easing.InOutSine }
+                                    }
+                                }
+
                                 RowLayout {
-                                    x: baseTextRow.x; y: baseTextRow.y
-                                    width: baseTextRow.width; height: baseTextRow.height
+                                    id: baseTextRow
+                                    anchors.fill: parent
+                                    anchors.margins: 12
                                     spacing: 10
                                     
-                                    Text { font.family: "Iosevka Nerd Font"; font.pixelSize: 20; color: window.crust; text: icon }
+                                    Text {
+                                        font.family: "Iosevka Nerd Font"
+                                        font.pixelSize: 20
+                                        color: floatCard.isMyBusy ? window.text : window.activeColor
+                                        text: icon
+                                        Behavior on color { ColorAnimation { duration: 200 } }
+                                    }
                                     
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 2
-
+                                        
                                         Item {
+                                            id: nameContainerBase
                                             Layout.fillWidth: true
                                             height: 18
                                             clip: true
+
                                             Row {
                                                 x: floatCard.textOffset
                                                 spacing: 30
-                                                Text { text: floatCard.itemName; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 13; color: window.crust }
-                                                Text { visible: floatCard.doMarquee; text: floatCard.itemName; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 13; color: window.crust }
+                                                Text {
+                                                    id: baseNameText
+                                                    text: floatCard.itemName
+                                                    font.family: "JetBrains Mono"
+                                                    font.weight: Font.Bold
+                                                    font.pixelSize: 13
+                                                    color: floatCard.isHighlighted ? window.activeColor : window.text
+                                                }
+                                                Text {
+                                                    visible: floatCard.doMarquee
+                                                    text: floatCard.itemName
+                                                    font.family: "JetBrains Mono"
+                                                    font.weight: Font.Bold
+                                                    font.pixelSize: 13
+                                                    color: floatCard.isHighlighted ? window.activeColor : window.text
+                                                }
                                             }
                                         }
+                                        
                                         Text {
-                                            font.family: "JetBrains Mono"; font.pixelSize: 10; color: window.crust
+                                            font.family: "JetBrains Mono"
+                                            font.pixelSize: 10
+                                            color: floatCard.isMyBusy ? window.activeColor : window.overlay0
                                             text: floatCard.isMyBusy ? "Connecting..." : (floatCard.renderFill > 0.1 && floatCard.renderFill < 1.0 ? "Hold..." : action)
+                                            Behavior on color { ColorAnimation { duration: 200 } }
                                         }
                                     }
                                 }
-                            }
 
-                            MouseArea {
-                                id: floatMa
-                                anchors.fill: parent
-                                hoverEnabled: floatCard.isInteractable
-                                cursorShape: (window.busyTask !== "" || floatCard.triggered || floatCard.isMyBusy || floatCard.renderFill === 1.0 || !floatCard.isInteractable) ? Qt.ArrowCursor : Qt.PointingHandCursor
-                                
-                                onPressed: { 
-                                    if (floatCard.isInteractable && window.busyTask === "" && !floatCard.triggered && !floatCard.isMyBusy && floatCard.fillLevel === 0.0) {
-                                        drainAnim.stop()
-                                        fillAnim.start()
-                                    }
-                                }
-                                onReleased: {
-                                    if (floatCard.isInteractable && !floatCard.triggered && !floatCard.isMyBusy && floatCard.fillLevel < 1.0) {
-                                        fillAnim.stop()
-                                        drainAnim.start()
-                                    }
-                                }
-                            }
-
-                            NumberAnimation {
-                                id: fillAnim
-                                target: floatCard
-                                property: "fillLevel"
-                                to: 1.0
-                                duration: 600 * (1.0 - floatCard.fillLevel) 
-                                easing.type: Easing.InSine
-                                onFinished: {
-                                    floatCard.triggered = true;
-                                    floatCard.flashOpacity = 0.6;
-                                    cardFlashAnim.start();
-                                    cardBumpAnim.start();
+                                Item {
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    width: floatCard.width * floatCard.renderFill
+                                    clip: true
                                     
-                                    if (cmdStr === "TOGGLE_VIEW") {
-                                        window.playSfx("switch.wav");
-                                        window.showInfoView = !window.showInfoView;
-                                        floatCard.triggered = false;
-                                        drainAnim.start();
-                                    } else if (isInfoNode && cmdStr) {
-                                        Quickshell.execDetached(["sh", "-c", cmdStr]);
-                                        if (window.activeMode === "bt") btPoller.running = true;
-                                        floatCard.triggered = false;
-                                        drainAnim.start(); 
-                                    } else {
-                                        window.busyTask = floatCard.itemId;
-                                        busyTimeout.start();
+                                    RowLayout {
+                                        x: baseTextRow.x; y: baseTextRow.y
+                                        width: baseTextRow.width; height: baseTextRow.height
+                                        spacing: 10
                                         
-                                        let cmd = window.activeMode === "wifi"
-                                            ? "nmcli device wifi connect '" + ssid + "'"
-                                            : "bash " + window.scriptsDir + "/bluetooth_panel_logic.sh --connect " + mac
+                                        Text { font.family: "Iosevka Nerd Font"; font.pixelSize: 20; color: window.crust; text: icon }
                                         
-                                        Quickshell.execDetached(["sh", "-c", cmd]);
-                                        if (window.activeMode === "wifi") wifiPoller.running = true; else btPoller.running = true;
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 2
+
+                                            Item {
+                                                Layout.fillWidth: true
+                                                height: 18
+                                                clip: true
+                                                Row {
+                                                    x: floatCard.textOffset
+                                                    spacing: 30
+                                                    Text { text: floatCard.itemName; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 13; color: window.crust }
+                                                    Text { visible: floatCard.doMarquee; text: floatCard.itemName; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 13; color: window.crust }
+                                                }
+                                            }
+                                            Text {
+                                                font.family: "JetBrains Mono"; font.pixelSize: 10; color: window.crust
+                                                text: floatCard.isMyBusy ? "Connecting..." : (floatCard.renderFill > 0.1 && floatCard.renderFill < 1.0 ? "Hold..." : action)
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                            
-                            NumberAnimation {
-                                id: drainAnim
-                                target: floatCard
-                                property: "fillLevel"
-                                to: 0.0
-                                duration: 1500 * floatCard.fillLevel 
-                                easing.type: Easing.OutQuad
+
+                                MouseArea {
+                                    id: floatMa
+                                    anchors.fill: parent
+                                    hoverEnabled: floatCard.isInteractable
+                                    cursorShape: (window.busyTask !== "" || floatCard.triggered || floatCard.isMyBusy || floatCard.renderFill === 1.0 || !floatCard.isInteractable) ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                    
+                                    onPressed: { 
+                                        if (floatCard.isInteractable && window.busyTask === "" && !floatCard.triggered && !floatCard.isMyBusy && floatCard.fillLevel === 0.0) {
+                                            drainAnim.stop()
+                                            fillAnim.start()
+                                        }
+                                    }
+                                    onReleased: {
+                                        if (floatCard.isInteractable && !floatCard.triggered && !floatCard.isMyBusy && floatCard.fillLevel < 1.0) {
+                                            fillAnim.stop()
+                                            drainAnim.start()
+                                        }
+                                    }
+                                }
+
+                                NumberAnimation {
+                                    id: fillAnim
+                                    target: floatCard
+                                    property: "fillLevel"
+                                    to: 1.0
+                                    duration: 600 * (1.0 - floatCard.fillLevel) 
+                                    easing.type: Easing.InSine
+                                    onFinished: {
+                                        floatCard.triggered = true;
+                                        floatCard.flashOpacity = 0.6;
+                                        cardFlashAnim.start();
+                                        cardBumpAnim.start();
+                                        
+                                        if (cmdStr === "TOGGLE_VIEW") {
+                                            window.playSfx("switch.wav");
+                                            window.showInfoView = !window.showInfoView;
+                                            floatCard.triggered = false;
+                                            drainAnim.start();
+                                        } else if (isInfoNode && cmdStr) {
+                                            Quickshell.execDetached(["sh", "-c", cmdStr]);
+                                            if (window.activeMode === "bt") btPoller.running = true;
+                                            floatCard.triggered = false;
+                                            drainAnim.start(); 
+                                        } else {
+                                            window.busyTask = floatCard.itemId;
+                                            busyTimeout.start();
+                                            
+                                            let cmd = window.activeMode === "wifi"
+                                                ? "nmcli device wifi connect '" + ssid + "'"
+                                                : "bash " + window.scriptsDir + "/bluetooth_panel_logic.sh --connect " + mac
+                                            
+                                            Quickshell.execDetached(["sh", "-c", cmd]);
+                                            if (window.activeMode === "wifi") wifiPoller.running = true; else btPoller.running = true;
+                                        }
+                                    }
+                                }
+                                
+                                NumberAnimation {
+                                    id: drainAnim
+                                    target: floatCard
+                                    property: "fillLevel"
+                                    to: 0.0
+                                    duration: 1500 * floatCard.fillLevel 
+                                    easing.type: Easing.OutQuad
+                                }
                             }
                         }
                     }
@@ -1398,7 +1439,7 @@ Item {
                             
                             if (window.expectedWifiPower === "on") window.playSfx("power_on.wav"); else window.playSfx("power_off.wav");
                             
-                            wifiPendingReset.start();
+                            wifiPendingReset.restart();
                             window.wifiPower = window.expectedWifiPower; // Optimistic
                             Quickshell.execDetached(["nmcli", "radio", "wifi", window.wifiPower]);
                             wifiPoller.running = true;
@@ -1409,7 +1450,7 @@ Item {
                             
                             if (window.expectedBtPower === "on") window.playSfx("power_on.wav"); else window.playSfx("power_off.wav");
                             
-                            btPendingReset.start();
+                            btPendingReset.restart();
                             window.btPower = window.expectedBtPower; // Optimistic
                             Quickshell.execDetached(["bash", window.scriptsDir + "/bluetooth_panel_logic.sh", "--toggle"]);
                             btPoller.running = true;
