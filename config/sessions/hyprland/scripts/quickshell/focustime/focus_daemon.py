@@ -44,7 +44,6 @@ def get_xdg_search_dirs():
     return search_dirs
 
 def build_desktop_cache():
-    """Scans all .desktop files to map Flatpak IDs and StartupWMClasses directly."""
     global CACHE_BUILT
     if CACHE_BUILT: return
     
@@ -58,21 +57,27 @@ def build_desktop_cache():
                         name, icon, wmclass = None, "", None
                         with open(path, 'r', encoding='utf-8') as file:
                             for line in file:
+                                line = line.strip()
                                 if line.startswith("Name=") and not name:
-                                    name = line.strip().split("=", 1)[1]
+                                    name = line.split("=", 1)[1].strip()
                                 elif line.startswith("Icon=") and not icon:
-                                    icon = line.strip().split("=", 1)[1]
+                                    icon = line.split("=", 1)[1].strip()
                                 elif line.startswith("StartupWMClass="):
-                                    wmclass = line.strip().split("=", 1)[1].lower()
+                                    wmclass = line.split("=", 1)[1].strip().lower()
                         
                         if name:
                             base = f[:-8].lower()
+                            
                             DESKTOP_CACHE_NAME[base] = name
                             DESKTOP_CACHE_ICON[base] = icon
+                            
+                            DESKTOP_CACHE_NAME[name.lower()] = name
+                            DESKTOP_CACHE_ICON[name.lower()] = icon
+
                             if wmclass:
                                 DESKTOP_CACHE_NAME[wmclass] = name
                                 DESKTOP_CACHE_ICON[wmclass] = icon
-                            # Map flatpak domain ends (com.discordapp.Discord -> discord)
+                                
                             parts = base.split('.')
                             if len(parts) > 1:
                                 DESKTOP_CACHE_NAME[parts[-1]] = name
@@ -90,15 +95,13 @@ def resolve_app_name(app_class, raw_title):
     build_desktop_cache()
     app_class_lower = app_class.lower()
     base_class = re.sub(r'[-_ ]?updater$', '', app_class_lower)
+    base_class = base_class.replace('.exe', '')
 
-    # 1. Exact or WMClass match
     if app_class_lower in DESKTOP_CACHE_NAME:
         return DESKTOP_CACHE_NAME[app_class_lower]
-    # 2. Match without the "updater" suffix
     if base_class in DESKTOP_CACHE_NAME:
         return DESKTOP_CACHE_NAME[base_class]
 
-    # 3. Fallback regex cleanup if no desktop file exists AT ALL
     clean_title = re.sub(r'^\(\d+\)\s*|^\[\d+\]\s*', '', raw_title)
     clean_title = re.sub(r'\s*\(\d+\)$', '', clean_title)
     
@@ -108,7 +111,6 @@ def resolve_app_name(app_class, raw_title):
     if len(name) > 25:
         name = app_class.capitalize()
 
-    # Cache the regex result so we don't calculate it again
     DESKTOP_CACHE_NAME[app_class_lower] = name
     return name
 
@@ -119,6 +121,7 @@ def get_app_icon(app_class):
     build_desktop_cache()
     app_class_lower = app_class.lower()
     base_class = re.sub(r'[-_ ]?updater$', '', app_class_lower)
+    base_class = base_class.replace('.exe', '')
 
     if app_class_lower in DESKTOP_CACHE_ICON:
         return DESKTOP_CACHE_ICON[app_class_lower]
@@ -151,7 +154,6 @@ def init_db():
         )
     ''')
 
-    # New 15-minute interval table
     c.execute('''
         CREATE TABLE IF NOT EXISTS focus_intervals (
             log_date TEXT,
@@ -229,6 +231,26 @@ def listen_hyprland_ipc():
 def dump_state_to_json(c):
     target_date = date.today()
     
+    yesterday = target_date - timedelta(days=1)
+    c.execute('SELECT SUM(seconds) FROM focus_log WHERE log_date = ?', (yesterday.isoformat(),))
+    yesterday_seconds = c.fetchone()[0] or 0
+
+    # Weekly Average and string formatting
+    monday = target_date - timedelta(days=target_date.weekday())
+    sunday = monday + timedelta(days=6)
+    week_range_str = f"{monday.strftime('%b')} {monday.day} - {sunday.strftime('%b')} {sunday.day}"
+
+    # Calculate average ONLY over days in current week that have non-zero usage
+    c.execute('''
+        SELECT COUNT(DISTINCT log_date), SUM(seconds) 
+        FROM focus_log 
+        WHERE log_date >= ? AND log_date <= ? AND seconds > 0
+    ''', (monday.isoformat(), sunday.isoformat()))
+    row = c.fetchone()
+    days_count = row[0] or 0
+    total_week = row[1] or 0
+    average_seconds = total_week // days_count if days_count > 0 else 0
+    
     c.execute('SELECT SUM(seconds) FROM focus_log WHERE log_date = ?', (target_date.isoformat(),))
     total_seconds = c.fetchone()[0] or 0
 
@@ -253,11 +275,11 @@ def dump_state_to_json(c):
             "percent": round(percentage, 1)
         })
 
-    monday = target_date - timedelta(days=target_date.weekday())
+    monday_iter = target_date - timedelta(days=target_date.weekday())
     days_str = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     week_data = []
     for i in range(7):
-        d = monday + timedelta(days=i)
+        d = monday_iter + timedelta(days=i)
         c.execute('SELECT SUM(seconds) FROM focus_log WHERE log_date = ?', (d.isoformat(),))
         tot = c.fetchone()[0] or 0
         week_data.append({"date": d.isoformat(), "day": days_str[i], "total": tot, "is_target": d == target_date})
@@ -276,31 +298,32 @@ def dump_state_to_json(c):
         tot = c.fetchone()[0] or 0
         month_data.append({"date": d.isoformat(), "total": tot, "is_target": d == target_date})
 
-    hourly_data = [0] * 96
+    hourly_data = [0] * 48
     
-    # Grab old legacy 1-hour interval data and map it to the first 15min bucket of that hour
     try:
         c.execute('SELECT hour, SUM(seconds) FROM focus_hourly WHERE log_date = ? GROUP BY hour', (target_date.isoformat(),))
         for row in c.fetchall():
             hr, secs = row
             if 0 <= hr <= 23:
-                hourly_data[hr * 4] += secs
+                hourly_data[hr * 2] += secs
     except sqlite3.OperationalError:
         pass 
         
-    # Grab new high-resolution 15-minute intervals
     try:
         c.execute('SELECT interval_idx, SUM(seconds) FROM focus_intervals WHERE log_date = ? GROUP BY interval_idx', (target_date.isoformat(),))
         for row in c.fetchall():
             idx, secs = row
             if 0 <= idx < 96:
-                hourly_data[idx] += secs
+                hourly_data[idx // 2] += secs
     except sqlite3.OperationalError:
         pass 
 
     result = {
         "selected_date": target_date.isoformat(),
         "total": total_seconds,
+        "average": average_seconds,
+        "week_range": week_range_str,
+        "yesterday": yesterday_seconds,
         "current": current_app_title,
         "apps": all_apps,
         "week": week_data,
@@ -342,7 +365,6 @@ def main():
                 DO UPDATE SET seconds = seconds + 1, app_title = excluded.app_title
             ''', (today, current_app_class, 1, current_app_title))
             
-            # Keeping legacy 1-hour tracking strictly for backward compatibility context if needed
             c.execute('''
                 INSERT INTO focus_hourly (log_date, hour, app_class, seconds)
                 VALUES (?, ?, ?, 1)
@@ -350,7 +372,6 @@ def main():
                 DO UPDATE SET seconds = seconds + 1
             ''', (today, current_hour, current_app_class))
             
-            # Pushing to new 15-minute resolution table
             c.execute('''
                 INSERT INTO focus_intervals (log_date, interval_idx, app_class, seconds)
                 VALUES (?, ?, ?, 1)

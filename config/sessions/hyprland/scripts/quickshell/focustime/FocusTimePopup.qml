@@ -36,12 +36,18 @@ Item {
     // -------------------------------------------------------------------------
     // STATE & POLLING PATHS
     // -------------------------------------------------------------------------
-    property var targetDate: new Date()
+    property var globalDate: new Date()
+    property var appDate: new Date()
+    readonly property var activeDate: window.selectedAppClass === "" ? window.globalDate : window.appDate
+
     property string selectedDateStr: ""
     property string selectedAppClass: "" 
     property string selectedAppName: ""
     property string selectedAppIcon: ""
     property int totalSeconds: 0
+    property int averageSeconds: 0
+    property int yesterdaySeconds: 0
+    property string weekRangeStr: ""
     property string liveActiveApp: "Desktop"
     
     property var topApps: []
@@ -50,8 +56,8 @@ Item {
     property var monthData: []
     property real maxMonthTotal: 1
     
-    // Updated to 96 blocks for 15-minute intervals (4 bars per hour)
-    property var hourlyData: new Array(96).fill(0)
+    // 48 blocks for 30-minute intervals (2 bars per hour)
+    property var hourlyData: new Array(48).fill(0)
     property real maxHourlyTotal: 1
     
     // Animation properties
@@ -86,6 +92,9 @@ Item {
     function updateFromData(data) {
         window.selectedDateStr = data.selected_date;
         window.totalSeconds = data.total || 0;
+        window.averageSeconds = data.average || 0;
+        window.yesterdaySeconds = data.yesterday || 0;
+        window.weekRangeStr = data.week_range || "";
         window.liveActiveApp = data.current || "Unknown";
 
         if (window.isFirstLoad) firstLoadTimer.start();
@@ -105,9 +114,9 @@ Item {
             syncMonthModel();
         }
 
-        window.hourlyData = data.hourly || new Array(96).fill(0);
+        window.hourlyData = data.hourly || new Array(48).fill(0);
         let currentMaxHour = 1;
-        for(let i=0; i<96; i++) {
+        for(let i=0; i<48; i++) {
             if (window.hourlyData[i] > currentMaxHour) currentMaxHour = window.hourlyData[i];
         }
         window.maxHourlyTotal = currentMaxHour;
@@ -115,10 +124,10 @@ Item {
 
     // --- DATA FETCHING ROUTING ---
     function requestDataUpdate() {
-        if (window.selectedAppClass === "" && getIsoDate(window.targetDate) === getIsoDate(new Date())) {
+        if (window.selectedAppClass === "" && getIsoDate(window.activeDate) === getIsoDate(new Date())) {
             liveFileReader.running = true;
         } else {
-            let cmd = ["python3", window.scriptsDir + "/get_stats.py", getIsoDate(window.targetDate)];
+            let cmd = ["python3", window.scriptsDir + "/get_stats.py", getIsoDate(window.activeDate)];
             if (window.selectedAppClass !== "") {
                 cmd.push("--app");
                 cmd.push(window.selectedAppClass);
@@ -180,16 +189,20 @@ Item {
     }
 
     function changeDay(offsetDays) {
-        let d = new Date(targetDate);
+        let d = new Date(window.activeDate);
         d.setDate(d.getDate() + offsetDays);
-        targetDate = d;
+        if (window.selectedAppClass === "") {
+            window.globalDate = d;
+        } else {
+            window.appDate = d;
+        }
         window.isFirstLoad = true; 
         window.requestDataUpdate();
     }
     
     function changeToDate(clickedDateStr) {
         if (!clickedDateStr) return;
-        let currentIso = getIsoDate(window.targetDate);
+        let currentIso = getIsoDate(window.activeDate);
         if (clickedDateStr === currentIso) return;
         let dCurrent = new Date(currentIso + "T12:00:00");
         let dClicked = new Date(clickedDateStr + "T12:00:00");
@@ -369,7 +382,12 @@ Item {
                             Text { anchors.centerIn: parent; font.family: "Iosevka Nerd Font"; text: ""; color: window.text; font.pixelSize: 18 }
                             MouseArea { 
                                 id: backMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; 
-                                onClicked: { window.selectedAppClass = ""; window.selectedAppName = ""; window.selectedAppIcon = ""; window.requestDataUpdate(); } 
+                                onClicked: { 
+                                    window.selectedAppClass = ""; 
+                                    window.selectedAppName = ""; 
+                                    window.selectedAppIcon = ""; 
+                                    window.requestDataUpdate(); 
+                                } 
                             }
                         }
 
@@ -385,7 +403,7 @@ Item {
                         }
                     }
                     
-                    // Title Area (Includes App Icon if App is selected)
+                    // Title Area
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
@@ -410,7 +428,7 @@ Item {
                             font.weight: Font.DemiBold
                             font.pixelSize: 18
                             color: window.text
-                            text: window.selectedAppClass !== "" ? `${window.selectedAppName} - ${window.getFancyDate(window.targetDate)}` : window.getFancyDate(window.targetDate)
+                            text: window.selectedAppClass !== "" ? `${window.selectedAppName} - ${window.getFancyDate(window.activeDate)}` : window.getFancyDate(window.activeDate)
                         }
 
                         Item { Layout.fillWidth: true } // Right Spacer
@@ -428,64 +446,147 @@ Item {
                     }
                 }
 
-                // Total Time Display
-                ColumnLayout {
+                // ==========================================
+                // 1.5 TOTAL TIME DISPLAY + AVERAGES (3 BOXES)
+                // ==========================================
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredHeight: 80
-                    spacing: 8
+                    Layout.preferredHeight: 90
+                    Layout.maximumHeight: 90 
+                    Layout.minimumHeight: 90
+                    spacing: 16
 
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
-                        font.family: "Inter, Roboto, sans-serif"
-                        font.weight: Font.Black
-                        font.pixelSize: 52
-                        color: window.text
-                        text: window.formatTimeLarge(window.animatedTotalSeconds)
-                    }
+                    // LEFT: Daily Average (2/7 weight = 200)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 200
+                        radius: 20
+                        color: window.base
+                        border.color: Qt.alpha(window.surface1, 0.3)
+                        border.width: 1
 
-                    Item {
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.preferredWidth: pillLoader.width
-                        Layout.preferredHeight: 24
-                        
-                        Loader {
-                            id: pillLoader
+                        ColumnLayout {
                             anchors.centerIn: parent
-                            sourceComponent: (window.isTodaySelected && window.selectedAppClass === "") ? activePillComponent : historyTextComponent
-                        }
-
-                        Component {
-                            id: activePillComponent
-                            Rectangle {
-                                implicitWidth: activeAppText.width + 24
-                                implicitHeight: 24
-                                radius: 12
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: window.mauve }
-                                    GradientStop { position: 1.0; color: window.blue }
-                                }
-                                Text {
-                                    id: activeAppText
-                                    anchors.centerIn: parent
-                                    font.family: "Inter, Roboto, sans-serif"
-                                    font.weight: Font.Bold
-                                    font.pixelSize: 12
-                                    color: window.crust
-                                    text: window.liveActiveApp
-                                }
-                            }
-                        }
-
-                        Component {
-                            id: historyTextComponent
+                            spacing: 2
                             Text {
+                                Layout.alignment: Qt.AlignHCenter
                                 font.family: "Inter, Roboto, sans-serif"
                                 font.weight: Font.Medium
                                 font.pixelSize: 13
                                 color: window.subtext0
-                                text: window.selectedAppClass !== "" ? "App Focus Time" : "Total Focus Time"
+                                text: "Daily average"
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                font.family: "Inter, Roboto, sans-serif"
+                                font.weight: Font.Bold
+                                font.pixelSize: 18
+                                color: window.text
+                                text: window.formatTimeList(window.averageSeconds)
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                font.family: "Inter, Roboto, sans-serif"
+                                font.weight: Font.Medium
+                                font.pixelSize: 11
+                                color: window.overlay0
+                                text: window.weekRangeStr
+                                visible: window.weekRangeStr !== ""
+                            }
+                        }
+                    }
+
+                    // CENTER: Usage Time (3/7 weight = 300)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 300
+                        radius: 20
+                        color: window.base
+                        border.color: Qt.alpha(window.surface1, 0.3)
+                        border.width: 1
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 0
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                font.family: "Inter, Roboto, sans-serif"
+                                font.weight: Font.Black
+                                font.pixelSize: 36
+                                color: window.text
+                                text: window.formatTimeLarge(window.animatedTotalSeconds)
+                            }
+                        }
+                    }
+
+                    // RIGHT: vs Yesterday (2/7 weight = 200)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: 200
+                        radius: 20
+                        color: window.base
+                        border.color: Qt.alpha(window.surface1, 0.3)
+                        border.width: 1
+
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 4
+                            
+                            // Trend Row
+                            RowLayout {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 6
+                                visible: !(window.totalSeconds === 0 && window.yesterdaySeconds === 0) && window.totalSeconds !== window.yesterdaySeconds
+                                
+                                Text {
+                                    font.family: "Inter, Roboto, sans-serif"
+                                    font.weight: Font.Black
+                                    font.pixelSize: 16
+                                    color: {
+                                        let diff = window.totalSeconds - window.yesterdaySeconds;
+                                        return diff > 0 ? window.peach : window.green;
+                                    }
+                                    text: (window.totalSeconds - window.yesterdaySeconds) > 0 ? "↑" : "↓"
+                                }
+                                
+                                Text {
+                                    font.family: "Inter, Roboto, sans-serif"
+                                    font.weight: Font.Bold
+                                    font.pixelSize: 16
+                                    color: {
+                                        let diff = window.totalSeconds - window.yesterdaySeconds;
+                                        return diff > 0 ? window.peach : window.green;
+                                    }
+                                    text: {
+                                        let diff = window.totalSeconds - window.yesterdaySeconds;
+                                        return window.formatTimeList(Math.abs(diff));
+                                    }
+                                }
+                            }
+
+                            // No Data / Same fallback
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                font.family: "Inter, Roboto, sans-serif"
+                                font.weight: Font.Bold
+                                font.pixelSize: 15
+                                color: window.overlay0
+                                text: (window.totalSeconds === 0 && window.yesterdaySeconds === 0) ? "No data" : "Same time"
+                                visible: (window.totalSeconds === 0 && window.yesterdaySeconds === 0) || window.totalSeconds === window.yesterdaySeconds
+                            }
+
+                            // Subtext
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                font.family: "Inter, Roboto, sans-serif"
+                                font.weight: Font.Medium
+                                font.pixelSize: 12
+                                color: window.subtext0
+                                text: "vs yesterday"
+                                visible: !(window.totalSeconds === 0 && window.yesterdaySeconds === 0)
                             }
                         }
                     }
@@ -598,7 +699,7 @@ Item {
                                 font.weight: Font.DemiBold
                                 font.pixelSize: 13
                                 color: window.text
-                                text: window.monthNames[window.targetDate.getMonth()]
+                                text: window.monthNames[window.activeDate.getMonth()]
                             }
 
                             Grid {
@@ -695,6 +796,7 @@ Item {
                                     window.selectedAppClass = model.appClass;
                                     window.selectedAppName = model.name;
                                     window.selectedAppIcon = model.icon;
+                                    window.appDate = new Date(); // Always start app view on today
                                     window.requestDataUpdate();
                                 }
                             }
@@ -759,7 +861,7 @@ Item {
                         }
                     }
 
-                    // --- VIEW B: 24-Hour App Activity Chart (Now 96 chunks) ---
+                    // --- VIEW B: 24-Hour App Activity Chart (Now 48 chunks / 30 mins) ---
                     ColumnLayout {
                         visible: window.selectedAppClass !== ""
                         anchors.fill: parent
@@ -778,10 +880,10 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: 2 // Reduced spacing so 96 bars fit neatly
+                            spacing: 4 
 
                             Repeater {
-                                model: 96 // 4 bars per hour
+                                model: 48 // 2 bars per hour (30 min intervals)
                                 delegate: Item {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true

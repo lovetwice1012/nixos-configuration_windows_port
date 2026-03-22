@@ -46,17 +46,23 @@ def build_desktop_cache():
                         name, icon, wmclass = None, "", None
                         with open(path, 'r', encoding='utf-8') as file:
                             for line in file:
+                                line = line.strip()
                                 if line.startswith("Name=") and not name:
-                                    name = line.strip().split("=", 1)[1]
+                                    name = line.split("=", 1)[1].strip()
                                 elif line.startswith("Icon=") and not icon:
-                                    icon = line.strip().split("=", 1)[1]
+                                    icon = line.split("=", 1)[1].strip()
                                 elif line.startswith("StartupWMClass="):
-                                    wmclass = line.strip().split("=", 1)[1].lower()
+                                    wmclass = line.split("=", 1)[1].strip().lower()
                         
                         if name:
                             base = f[:-8].lower()
+                            
                             DESKTOP_CACHE_NAME[base] = name
                             DESKTOP_CACHE_ICON[base] = icon
+                            
+                            DESKTOP_CACHE_NAME[name.lower()] = name
+                            DESKTOP_CACHE_ICON[name.lower()] = icon
+
                             if wmclass:
                                 DESKTOP_CACHE_NAME[wmclass] = name
                                 DESKTOP_CACHE_ICON[wmclass] = icon
@@ -76,6 +82,7 @@ def get_app_icon(app_class):
     
     app_class_lower = app_class.lower()
     base_class = re.sub(r'[-_ ]?updater$', '', app_class_lower)
+    base_class = base_class.replace('.exe', '')
 
     if app_class_lower in DESKTOP_CACHE_ICON:
         return DESKTOP_CACHE_ICON[app_class_lower]
@@ -98,7 +105,10 @@ def main():
         target_date = date.today()
 
     if not os.path.exists(DB_PATH):
-        print(json.dumps({"total": 0, "current": "History", "apps": [], "week": [], "month": [], "hourly": [0]*96}))
+        print(json.dumps({
+            "total": 0, "average": 0, "week_range": "", "yesterday": 0, "current": "History", 
+            "apps": [], "week": [], "month": [], "hourly": [0]*48
+        }))
         return
 
     conn = sqlite3.connect(DB_PATH)
@@ -106,6 +116,27 @@ def main():
 
     filter_sql = " AND app_class = ?" if app_filter else ""
     params = (target_date.isoformat(), app_filter) if app_filter else (target_date.isoformat(),)
+
+    yesterday = target_date - timedelta(days=1)
+    params_y = (yesterday.isoformat(), app_filter) if app_filter else (yesterday.isoformat(),)
+    c.execute(f'SELECT SUM(seconds) FROM focus_log WHERE log_date = ?{filter_sql}', params_y)
+    yesterday_seconds = c.fetchone()[0] or 0
+
+    # Calculate Weekly Average and Dates
+    monday = target_date - timedelta(days=target_date.weekday())
+    sunday = monday + timedelta(days=6)
+    week_range_str = f"{monday.strftime('%b')} {monday.day} - {sunday.strftime('%b')} {sunday.day}"
+
+    params_avg = (monday.isoformat(), sunday.isoformat(), app_filter) if app_filter else (monday.isoformat(), sunday.isoformat())
+    c.execute(f'''
+        SELECT COUNT(DISTINCT log_date), SUM(seconds) 
+        FROM focus_log 
+        WHERE log_date >= ? AND log_date <= ? AND seconds > 0 {filter_sql}
+    ''', params_avg)
+    row = c.fetchone()
+    days_count = row[0] or 0
+    total_week = row[1] or 0
+    average_seconds = total_week // days_count if days_count > 0 else 0
 
     c.execute(f'SELECT SUM(seconds) FROM focus_log WHERE log_date = ?{filter_sql}', params)
     total_seconds = c.fetchone()[0] or 0
@@ -131,12 +162,12 @@ def main():
             "percent": round(percentage, 1)
         })
     
-    monday = target_date - timedelta(days=target_date.weekday())
+    monday_iter = target_date - timedelta(days=target_date.weekday())
     days_str = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     week_data = []
     
     for i in range(7):
-        d = monday + timedelta(days=i)
+        d = monday_iter + timedelta(days=i)
         p = (d.isoformat(), app_filter) if app_filter else (d.isoformat(),)
         c.execute(f'SELECT SUM(seconds) FROM focus_log WHERE log_date = ?{filter_sql}', p)
         tot = c.fetchone()[0] or 0
@@ -157,31 +188,32 @@ def main():
         tot = c.fetchone()[0] or 0
         month_data.append({"date": d.isoformat(), "total": tot, "is_target": d == target_date})
 
-    hourly_data = [0] * 96
+    hourly_data = [0] * 48
     
-    # Old legacy fallback
     try:
         c.execute(f'SELECT hour, SUM(seconds) FROM focus_hourly WHERE log_date = ?{filter_sql} GROUP BY hour', params)
         for row in c.fetchall():
             hr, secs = row
             if 0 <= hr <= 23:
-                hourly_data[hr * 4] += secs
+                hourly_data[hr * 2] += secs
     except sqlite3.OperationalError:
         pass
 
-    # New 15-minute resolution data
     try:
         c.execute(f'SELECT interval_idx, SUM(seconds) FROM focus_intervals WHERE log_date = ?{filter_sql} GROUP BY interval_idx', params)
         for row in c.fetchall():
             idx, secs = row
             if 0 <= idx < 96:
-                hourly_data[idx] += secs
+                hourly_data[idx // 2] += secs
     except sqlite3.OperationalError:
         pass
 
     result = {
         "selected_date": target_date.isoformat(),
         "total": total_seconds,
+        "average": average_seconds,
+        "week_range": week_range_str,
+        "yesterday": yesterday_seconds,
         "current": app_filter if app_filter else "History",
         "apps": all_apps,
         "week": week_data,
