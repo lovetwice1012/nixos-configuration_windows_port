@@ -321,11 +321,11 @@ PanelWindow {
                             
                             Layout.preferredHeight: 32; radius: 10
                             
-                            // PERFECTED WORKSPACE STATES
+                            // PERFECTED WORKSPACE STATES - Darker occupied state & slightly dimmed active
                             color: modelData.state === "active" 
-                                    ? mocha.mauve 
+                                    ? Qt.rgba(mocha.mauve.r, mocha.mauve.g, mocha.mauve.b, 0.9)
                                     : (modelData.state === "occupied" 
-                                        ? Qt.rgba(mocha.surface2.r, mocha.surface2.g, mocha.surface2.b, 0.7) 
+                                        ? Qt.rgba(mocha.surface2.r, mocha.surface2.g, mocha.surface2.b, 0.9) 
                                         : (isHovered ? Qt.rgba(mocha.surface1.r, mocha.surface1.g, mocha.surface1.b, 0.6) : "transparent"))
                             
                             // Safe Instantiation Cascade logic
@@ -360,9 +360,9 @@ PanelWindow {
                                 font.pixelSize: 14
                                 font.weight: modelData.state === "active" ? Font.Black : Font.Bold
                                 
-                                // PERFECTED TEXT CONTRAST
+                                // PERFECTED TEXT CONTRAST - True black/darkest for active
                                 color: modelData.state === "active" 
-                                        ? mocha.base 
+                                        ? mocha.crust 
                                         : (modelData.state === "occupied" ? mocha.text : mocha.overlay0)
                                         
                                 Behavior on color { ColorAnimation { duration: 250 } }
@@ -425,7 +425,17 @@ PanelWindow {
                                     border.width: barWindow.musicData.status === "Playing" ? 1 : 0
                                     border.color: mocha.mauve
                                     clip: true
-                                    Image { anchors.fill: parent; source: barWindow.musicData.artUrl || ""; fillMode: Image.PreserveAspectCrop }
+                                    Image { 
+                                        anchors.fill: parent; 
+                                        source: barWindow.musicData.artUrl || ""; 
+                                        fillMode: Image.PreserveAspectCrop 
+                                    }
+                                    
+                                    // NEW: Dimmed slightly by tinting with the primary mauve accent, matching the weather icon
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: Qt.rgba(mocha.mauve.r, mocha.mauve.g, mocha.mauve.b, 0.2)
+                                    }
                                 }
                                 ColumnLayout {
                                     spacing: -2
@@ -549,7 +559,13 @@ PanelWindow {
                 // Weatherbox
                 RowLayout {
                     spacing: 8
-                    Text { text: barWindow.weatherIcon; font.family: "Iosevka Nerd Font"; font.pixelSize: 24; color: barWindow.weatherHex }
+                    Text { 
+                        text: barWindow.weatherIcon; 
+                        font.family: "Iosevka Nerd Font"; 
+                        font.pixelSize: 24; 
+                        // Dimmed slightly by tinting the raw hex with the primary mauve accent
+                        color: Qt.tint(barWindow.weatherHex, Qt.rgba(mocha.mauve.r, mocha.mauve.g, mocha.mauve.b, 0.4)) 
+                    }
                     Text { text: barWindow.weatherTemp; font.family: "JetBrains Mono"; font.pixelSize: 17; font.weight: Font.Black; color: mocha.peach }
                 }
             }

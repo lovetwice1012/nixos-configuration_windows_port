@@ -42,8 +42,9 @@
       "pin, title:^(qs-master)$"
       "noshadow, title:^(qs-master)$"
       "noborder, title:^(qs-master)$"
-      "move -5000 -5000, title:^(qs-master)$"
       "noinitialfocus, title:^(qs-master)$"
+      "move -5000 -5000, title:^(qs-master)$"
+      
     ];
   };
 }

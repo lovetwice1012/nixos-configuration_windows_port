@@ -107,7 +107,7 @@ def main():
     if not os.path.exists(DB_PATH):
         print(json.dumps({
             "total": 0, "average": 0, "week_range": "", "yesterday": 0, "current": "History", 
-            "apps": [], "week": [], "month": [], "hourly": [0]*48
+            "apps": [], "week_apps": [], "week": [], "month": [], "hourly": [0]*48, "week_heatmap": [[0]*24 for _ in range(7)]
         }))
         return
 
@@ -161,7 +161,26 @@ def main():
             "seconds": secs,
             "percent": round(percentage, 1)
         })
-    
+
+    # --- NEW: Week Apps ---
+    c.execute(f'''
+        SELECT app_class, COALESCE(app_title, app_class), SUM(seconds) as secs 
+        FROM focus_log 
+        WHERE log_date >= ? AND log_date <= ? {filter_sql}
+        GROUP BY app_class 
+        ORDER BY secs DESC LIMIT 50
+    ''', params_avg)
+    week_apps_rows = c.fetchall()
+    week_apps_total = sum([r[2] for r in week_apps_rows])
+    week_apps = []
+    for r in week_apps_rows:
+        cls, title, secs = r
+        pct = (secs / week_apps_total) * 100 if week_apps_total > 0 else 0
+        week_apps.append({
+            "class": cls, "name": title, "icon": get_app_icon(cls),
+            "seconds": secs, "percent": round(pct, 1)
+        })
+
     monday_iter = target_date - timedelta(days=target_date.weekday())
     days_str = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     week_data = []
@@ -208,6 +227,23 @@ def main():
     except sqlite3.OperationalError:
         pass
 
+    # --- NEW: Week Heatmap (7x24) ---
+    week_heatmap = [[0]*24 for _ in range(7)]
+    try:
+        c.execute(f'''
+            SELECT log_date, hour, SUM(seconds)
+            FROM focus_hourly
+            WHERE log_date >= ? AND log_date <= ? {filter_sql}
+            GROUP BY log_date, hour
+        ''', params_avg)
+        for row in c.fetchall():
+            ldate, hr, secs = row
+            day_idx = date.fromisoformat(ldate).weekday()
+            if 0 <= hr <= 23:
+                week_heatmap[day_idx][hr] += secs
+    except sqlite3.OperationalError:
+        pass
+
     result = {
         "selected_date": target_date.isoformat(),
         "total": total_seconds,
@@ -216,9 +252,11 @@ def main():
         "yesterday": yesterday_seconds,
         "current": app_filter if app_filter else "History",
         "apps": all_apps,
+        "week_apps": week_apps,
         "week": week_data,
         "month": month_data,
-        "hourly": hourly_data
+        "hourly": hourly_data,
+        "week_heatmap": week_heatmap
     }
     
     print(json.dumps(result))

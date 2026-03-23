@@ -5,34 +5,55 @@ import "../"
 Item {
     id: root
 
-    MatugenColors {id: _theme}
+    MatugenColors { id: _theme }
+    
+    // -------------------------------------------------------------------------
+    // COLORS (Dynamic Matugen Palette)
+    // -------------------------------------------------------------------------
+    readonly property color base: _theme.base
+    readonly property color mantle: _theme.mantle
+    readonly property color crust: _theme.crust
+    readonly property color text: _theme.text
+    readonly property color surface0: _theme.surface0
+    readonly property color surface1: _theme.surface1
+    readonly property color surface2: _theme.surface2
+    
+    readonly property color mauve: _theme.mauve
+    readonly property color pink: _theme.pink
+    readonly property color blue: _theme.blue
+    readonly property color sapphire: _theme.sapphire
 
     // Master Container
     Rectangle {
         id: windowContent
         anchors.fill: parent
         radius: 12
-        color: _theme.base // Catppuccin Mocha: Base
+        color: root.base 
         clip: true
 
         // ---------------------------------------------------------------------
         // GLOBAL THEME & STATE CONTROLS
         // ---------------------------------------------------------------------
         
-        // 5. Slow Color Temperature Drift
-        property color currentBasePurple: _theme.mauve
-        SequentialAnimation on currentBasePurple {
+        // 5. Slow Color Temperature Drift (Fixed for Live Theme Reloading)
+        property real baseBlend: 0.0
+        SequentialAnimation on baseBlend {
             loops: Animation.Infinite; running: true
-            ColorAnimation { to: _theme.pink; duration: 15000; easing.type: Easing.InOutSine } // Warmer
-            ColorAnimation { to: _theme.mauve; duration: 15000; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1.0; duration: 15000; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 0.0; duration: 15000; easing.type: Easing.InOutSine }
         }
+        // Dynamically tints between mauve and pink based on the live theme properties
+        property color currentBasePurple: Qt.tint(root.mauve, Qt.rgba(root.pink.r, root.pink.g, root.pink.b, baseBlend))
 
-        property color currentAccentLavender: _theme.blue
-        SequentialAnimation on currentAccentLavender {
+        property real accentBlend: 0.0
+        SequentialAnimation on accentBlend {
             loops: Animation.Infinite; running: true
-            ColorAnimation { to: _theme.sapphire; duration: 15000; easing.type: Easing.InOutSine } // Cooler
-            ColorAnimation { to: _theme.blue; duration: 15000; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1.0; duration: 15000; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 0.0; duration: 15000; easing.type: Easing.InOutSine }
         }
+        // Dynamically tints between blue and sapphire based on the live theme properties
+        property color currentAccentLavender: Qt.tint(root.blue, Qt.rgba(root.sapphire.r, root.sapphire.g, root.sapphire.b, accentBlend))
+
         // Animation States
         property real calmState: 0.0 
         property real popShockwave: 0.0 
@@ -227,8 +248,8 @@ Item {
                     
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#45475a" }
-                        GradientStop { position: 1.0; color: "#313244" }
+                        GradientStop { position: 0.0; color: root.surface2 }
+                        GradientStop { position: 1.0; color: root.surface0 }
                     }
                 }
 
@@ -337,7 +358,7 @@ Item {
                                 width: (index % 3) + 2
                                 height: width
                                 radius: width/2
-                                color: "#ffffff"
+                                color: root.text
                                 rotation: windowContent.time * 20 * (index % 2 === 0 ? 1 : -1)
                             }
                         }
@@ -367,7 +388,7 @@ Item {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: Math.max(0.0, Math.min(1.0, refractionLayer.sweepPos - 0.2)); color: "transparent" }
-                            GradientStop { position: Math.max(0.0, Math.min(1.0, refractionLayer.sweepPos)); color: "#15FFFFFF" }
+                            GradientStop { position: Math.max(0.0, Math.min(1.0, refractionLayer.sweepPos)); color: Qt.alpha(root.text, 0.08) }
                             GradientStop { position: Math.max(0.0, Math.min(1.0, refractionLayer.sweepPos + 0.2)); color: "transparent" }
                         }
                     }
@@ -379,7 +400,7 @@ Item {
                         radius: width / 2
                         color: "transparent"
                         border.width: 1.5
-                        border.color: Qt.rgba(255, 255, 255, 0.15 + windowContent.breathA * 0.1)
+                        border.color: Qt.rgba(root.text.r, root.text.g, root.text.b, 0.15 + windowContent.breathA * 0.1)
                         antialiasing: true
                         layer.enabled: true
                         layer.effect: MultiEffect { blurEnabled: true; blurMax: 4; blur: 1.0 }

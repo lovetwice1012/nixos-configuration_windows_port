@@ -24,6 +24,14 @@ Item {
     
     readonly property color mauve: _theme.mauve
     readonly property color blue: _theme.blue
+    readonly property color pink: _theme.pink
+    readonly property color teal: _theme.teal
+    readonly property color yellow: _theme.yellow
+    readonly property color peach: _theme.peach
+    readonly property color green: _theme.green
+    readonly property color red: _theme.red
+    readonly property color sapphire: _theme.sapphire
+
     // -------------------------------------------------------------------------
     // STATE & MATH
     // -------------------------------------------------------------------------
@@ -41,8 +49,9 @@ Item {
         id: monitorsModel
     }
     
-    property color selectedResAccent: "#cba6f7"
-    property color selectedRateAccent: "#b4befe"
+    // Replaced hardcoded accents with dynamic defaults
+    property color selectedResAccent: window.mauve
+    property color selectedRateAccent: window.blue
 
     property real currentSimW: monitorsModel.count > 0 ? monitorsModel.get(0).resW : 1920
     property real currentSimH: monitorsModel.count > 0 ? monitorsModel.get(0).resH : 1080
@@ -334,12 +343,12 @@ Item {
                                     orientation: Gradient.Vertical
                                     GradientStop { 
                                         position: 0.0
-                                        color: Qt.tint(window.surface0, Qt.rgba(window.selectedResAccent.r, window.selectedResAccent.g, window.selectedResAccent.b, 0.15))
+                                        color: Qt.tint(window.surface0, Qt.alpha(window.selectedResAccent, 0.15))
                                         Behavior on color { ColorAnimation { duration: 400 } } 
                                     }
                                     GradientStop { 
                                         position: 1.0
-                                        color: Qt.tint(window.surface0, Qt.rgba(window.selectedRateAccent.r, window.selectedRateAccent.g, window.selectedRateAccent.b, 0.1))
+                                        color: Qt.tint(window.surface0, Qt.alpha(window.selectedRateAccent, 0.1))
                                         Behavior on color { ColorAnimation { duration: 400 } } 
                                     }
                                 }
@@ -351,7 +360,7 @@ Item {
                                     spacing: 20
                                     Repeater { 
                                         model: 150
-                                        Rectangle { width: 2; height: 2; radius: 1; color: "#1affffff" } 
+                                        Rectangle { width: 2; height: 2; radius: 1; color: Qt.alpha(window.text, 0.1) } 
                                     } 
                                 }
 
@@ -413,7 +422,7 @@ Item {
                             spacing: 18
                             Repeater { 
                                 model: 850
-                                Rectangle { width: 2; height: 2; radius: 1; color: "#1affffff" } 
+                                Rectangle { width: 2; height: 2; radius: 1; color: Qt.alpha(window.text, 0.1) } 
                             }
                         }
 
@@ -666,16 +675,16 @@ Item {
                         rowSpacing: 10
 
                         Repeater {
-                            model: ListModel {
-                                ListElement { resW: 3840; resH: 2160; label: "4K"; accent: "#f5c2e7" } 
-                                ListElement { resW: 2560; resH: 1440; label: "QHD"; accent: "#cba6f7" }
-                                ListElement { resW: 1920; resH: 1080; label: "FHD"; accent: "#89b4fa" }
-                                ListElement { resW: 1600; resH: 900;  label: "HD+"; accent: "#94e2d5" } 
-                                ListElement { resW: 1366; resH: 768;  label: "WXGA"; accent: "#f9e2af" } 
-                                ListElement { resW: 1280; resH: 720;  label: "HD"; accent: "#fab387" } 
-                                ListElement { resW: 1024; resH: 768;  label: "XGA"; accent: "#a6e3a1" } 
-                                ListElement { resW: 800;  resH: 600;  label: "SVGA"; accent: "#f38ba8" } 
-                            }
+                            model: [
+                                { resW: 3840, resH: 2160, label: "4K",   accent: window.pink }, 
+                                { resW: 2560, resH: 1440, label: "QHD",  accent: window.mauve },
+                                { resW: 1920, resH: 1080, label: "FHD",  accent: window.blue },
+                                { resW: 1600, resH: 900,  label: "HD+",  accent: window.teal }, 
+                                { resW: 1366, resH: 768,  label: "WXGA", accent: window.yellow }, 
+                                { resW: 1280, resH: 720,  label: "HD",   accent: window.peach }, 
+                                { resW: 1024, resH: 768,  label: "XGA",  accent: window.green }, 
+                                { resW: 800,  resH: 600,  label: "SVGA", accent: window.red } 
+                            ]
 
                             delegate: Rectangle {
                                 Layout.fillWidth: true
@@ -685,11 +694,11 @@ Item {
                                 property bool isSel: {
                                     if (monitorsModel.count === 0) return false;
                                     let activeMon = monitorsModel.get(window.activeEditIndex);
-                                    return activeMon.resW === resW && activeMon.resH === resH;
+                                    return activeMon.resW === modelData.resW && activeMon.resH === modelData.resH;
                                 }
-                                property color accentColor: accent
+                                property color accentColor: modelData.accent
                                 
-                                color: isSel ? Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.1) : (resMa.containsMouse ? window.surface0 : window.mantle)
+                                color: isSel ? Qt.alpha(accentColor, 0.15) : (resMa.containsMouse ? window.surface0 : window.mantle)
                                 border.color: isSel ? accentColor : (resMa.containsMouse ? window.surface1 : "transparent")
                                 border.width: isSel ? 2 : 1
                                 
@@ -706,7 +715,7 @@ Item {
                                         font.weight: isSel ? Font.Black : Font.Bold
                                         font.pixelSize: 16
                                         color: isSel ? accentColor : window.text
-                                        text: label
+                                        text: modelData.label
                                         Behavior on color { ColorAnimation { duration: 200 } } 
                                     }
                                     
@@ -716,7 +725,7 @@ Item {
                                         font.family: "JetBrains Mono"
                                         font.pixelSize: 12
                                         color: isSel ? window.text : window.overlay0
-                                        text: resW + "x" + resH
+                                        text: modelData.resW + "x" + modelData.resH
                                         Behavior on color { ColorAnimation { duration: 200 } } 
                                     }
                                 }
@@ -732,8 +741,8 @@ Item {
                                     onClicked: {
                                         if (monitorsModel.count > 0) {
                                             window.selectedResAccent = accentColor;
-                                            monitorsModel.setProperty(window.activeEditIndex, "resW", resW);
-                                            monitorsModel.setProperty(window.activeEditIndex, "resH", resH);
+                                            monitorsModel.setProperty(window.activeEditIndex, "resW", modelData.resW);
+                                            monitorsModel.setProperty(window.activeEditIndex, "resH", modelData.resH);
                                             delayedLayoutUpdate.restart();
                                         }
                                     }
@@ -753,7 +762,7 @@ Item {
                         Layout.rightMargin: 10
 
                         property var rates: [60, 75, 100, 120, 144, 240]
-                        property var rateColors: ["#f38ba8", "#b4befe", "#89b4fa", "#74c7ec", "#94e2d5", "#a6e3a1"]
+                        property var rateColors: [window.red, window.mauve, window.blue, window.sapphire, window.teal, window.green]
                         
                         property int currentIndex: {
                             if (monitorsModel.count === 0) return 0;
@@ -831,7 +840,7 @@ Item {
                             Behavior on color { ColorAnimation { duration: 150 } }
                             
                             border.width: sliderMa.containsMouse ? 4 : 0
-                            border.color: Qt.rgba(window.selectedRateAccent.r, window.selectedRateAccent.g, window.selectedRateAccent.b, 0.3)
+                            border.color: Qt.alpha(window.selectedRateAccent, 0.3)
                             Behavior on border.width { NumberAnimation { duration: 150 } }
                         }
 
@@ -920,7 +929,7 @@ Item {
                         id: flashRect
                         anchors.fill: parent
                         radius: 25
-                        color: "#ffffff"
+                        color: window.text
                         opacity: 0.0
                         PropertyAnimation on opacity { 
                             id: applyFlashAnim

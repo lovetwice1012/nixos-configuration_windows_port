@@ -367,7 +367,7 @@ Item {
                             font.weight: Font.Black
                             font.pixelSize: 84
                             color: window.text
-                            style: Text.Outline; styleColor: "#40000000"
+                            style: Text.Outline; styleColor: Qt.alpha(window.crust, 0.4)
                         }
                         Text {
                             text: Qt.formatTime(window.currentTime, ":ss")
@@ -378,7 +378,7 @@ Item {
                             Layout.alignment: Qt.AlignBottom
                             Layout.bottomMargin: 15
                             opacity: window.secondPulse > 1.02 ? 1.0 : 0.6 
-                            style: Text.Outline; styleColor: "#40000000"
+                            style: Text.Outline; styleColor: Qt.alpha(window.crust, 0.4)
                             Behavior on color { ColorAnimation { duration: 1000 } }
                         }
                     }
@@ -428,8 +428,8 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             radius: 28
-                            color: isHighlighted ? window.activeWeatherHex : (hrMa.containsMouse ? "#3affffff" : "#0dffffff")
-                            border.color: isHighlighted ? "transparent" : (hrMa.containsMouse ? window.activeWeatherHex : "#1affffff")
+                            color: isHighlighted ? window.activeWeatherHex : (hrMa.containsMouse ? Qt.alpha(window.surface2, 0.6) : Qt.alpha(window.surface0, 0.3))
+                            border.color: isHighlighted ? "transparent" : (hrMa.containsMouse ? window.activeWeatherHex : Qt.alpha(window.surface1, 0.5))
                             border.width: 1
                             
                             Behavior on color { ColorAnimation { duration: 200 } }
@@ -441,7 +441,7 @@ Item {
                                 Text { 
                                     Layout.alignment: Qt.AlignHCenter
                                     text: modelData.time
-                                    font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 10
+                                    font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 12
                                     color: isHighlighted ? window.mantle : (hrMa.containsMouse ? window.text : window.overlay1)
                                 }
                                 
@@ -457,7 +457,7 @@ Item {
                                 
                                 Text { 
                                     Layout.alignment: Qt.AlignHCenter; text: modelData.temp + "°"
-                                    font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: 12
+                                    font.family: "JetBrains Mono"; font.weight: Font.Black; font.pixelSize: 14
                                     color: isHighlighted ? window.base : window.text 
                                 }
                             }
@@ -477,9 +477,9 @@ Item {
                 anchors.margins: 40
                 width: 320
                 height: 420
-                color: "#05ffffff" 
+                color: Qt.alpha(window.surface0, 0.2) 
                 radius: 30
-                border.color: "#1affffff"
+                border.color: Qt.alpha(window.surface1, 0.4)
                 border.width: 1
                 z: 10 
 
@@ -508,7 +508,7 @@ Item {
                             text: window.targetMonthName.toUpperCase()
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: 15
+                            font.pixelSize: 16
                             color: window.text
                             horizontalAlignment: Text.AlignHCenter
                         }
@@ -542,7 +542,7 @@ Item {
                                 text: modelData
                                 font.family: "JetBrains Mono"
                                 font.weight: Font.Black
-                                font.pixelSize: 12
+                                font.pixelSize: 14
                                 color: window.overlay0
                                 horizontalAlignment: Text.AlignHCenter
                             }
@@ -562,7 +562,7 @@ Item {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 
-                                color: isToday ? window.activeWeatherHex : (dayMa.containsMouse ? "#2affffff" : "transparent")
+                                color: isToday ? window.activeWeatherHex : (dayMa.containsMouse ? Qt.alpha(window.surface2, 0.4) : "transparent")
                                 radius: 14
                                 scale: dayMa.containsMouse ? 1.2 : 1.0
                                 border.color: isToday ? window.surface0 : (dayMa.containsMouse ? window.overlay0 : "transparent")
@@ -576,7 +576,7 @@ Item {
                                     text: dayNum
                                     font.family: "JetBrains Mono"
                                     font.weight: isToday ? Font.Black : Font.Bold
-                                    font.pixelSize: 13
+                                    font.pixelSize: 14
                                     color: isToday ? window.base : (isCurrentMonth ? window.text : window.surface0)
                                     Behavior on color { ColorAnimation { duration: 200 } }
                                 }
@@ -596,7 +596,7 @@ Item {
                             text: "Return to Today"
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: 11
+                            font.pixelSize: 14
                             color: resetMa.containsMouse ? window.text : window.overlay0
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
@@ -647,7 +647,7 @@ Item {
                             text: window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].day_full.toUpperCase() : "LOADING..."
                             font.family: "JetBrains Mono"
                             font.weight: Font.Black
-                            font.pixelSize: 14
+                            font.pixelSize: 16
                             color: window.text
                         }
                         
@@ -682,7 +682,7 @@ Item {
                             font.weight: Font.Black
                             font.pixelSize: 84
                             color: window.text
-                            style: Text.Outline; styleColor: "#40000000"
+                            style: Text.Outline; styleColor: Qt.alpha(window.crust, 0.4)
                         }
                         
                         Text {
@@ -690,7 +690,7 @@ Item {
                             text: window.weatherData && window.weatherData.forecast[window.weatherView] ? window.weatherData.forecast[window.weatherView].desc : ""
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: 18
+                            font.pixelSize: 16
                             color: window.activeWeatherHex
                             Behavior on color { ColorAnimation { duration: 1000 } }
                         }
@@ -754,7 +754,7 @@ Item {
                                             
                                             ctx.beginPath();
                                             ctx.arc(r, r, r - 4, 0, 2 * Math.PI);
-                                            ctx.strokeStyle = "#1affffff";
+                                            ctx.strokeStyle = Qt.alpha(window.text, 0.1);
                                             ctx.lineWidth = 3;
                                             ctx.stroke();
                                             
@@ -778,7 +778,7 @@ Item {
                                         text: modelData.val
                                         font.family: "JetBrains Mono"
                                         font.weight: Font.Black
-                                        font.pixelSize: 13
+                                        font.pixelSize: 14
                                         color: window.text
                                     }
                                 }
@@ -791,7 +791,7 @@ Item {
                                     Text { 
                                         text: modelData.icon
                                         font.family: "Iosevka Nerd Font"
-                                        font.pixelSize: 12
+                                        font.pixelSize: 14
                                         color: gaugeMa.containsMouse ? window.activeWeatherHex : window.overlay0
                                         Behavior on color { ColorAnimation { duration: 200 } }
                                     }
@@ -799,7 +799,7 @@ Item {
                                         text: modelData.lbl
                                         font.family: "JetBrains Mono"
                                         font.weight: Font.Bold
-                                        font.pixelSize: 10
+                                        font.pixelSize: 12
                                         color: window.overlay0 
                                     }
                                 }
@@ -826,11 +826,11 @@ Item {
                     anchors.fill: parent
                     gradient: Gradient {
                         GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 1.0; color: "#1a000000" }
+                        GradientStop { position: 1.0; color: Qt.alpha(window.crust, 0.6) }
                     }
                 }
 
-                Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: "#1affffff" }
+                Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: Qt.alpha(window.surface1, 0.5) }
 
                 Canvas {
                     anchors.fill: parent
@@ -886,14 +886,14 @@ Item {
                         
                         Rectangle {
                             width: 40; height: 40; radius: 20; color: window.surface0
-                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: 18; color: window.mauve }
+                            Text { anchors.centerIn: parent; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: 18; color: window.timeAccent }
                         }
                         
                         Text { 
                             text: window.scheduleData ? window.scheduleData.header : "Loading Schedule..."
                             font.family: "JetBrains Mono"
                             font.weight: Font.Bold
-                            font.pixelSize: 12
+                            font.pixelSize: 16
                             color: window.overlay0
                         }
                         
@@ -901,15 +901,15 @@ Item {
                         
                         Rectangle {
                             width: 120; height: 36; radius: 18
-                            color: schLinkMa.containsMouse ? window.mauve : "#1affffff"
+                            color: schLinkMa.containsMouse ? window.mauve : Qt.alpha(window.surface1, 0.5)
                             border.color: window.mauve; border.width: 1
                             Behavior on color { ColorAnimation { duration: 150 } }
                             
                             RowLayout {
                                 anchors.centerIn: parent
                                 spacing: 6
-                                Text { text: "Open Web"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 12; color: schLinkMa.containsMouse ? window.base : window.text }
-                                Text { text: ""; font.family: "Iosevka Nerd Font"; color: schLinkMa.containsMouse ? window.base : window.text }
+                                Text { text: "Open Web"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 14; color: schLinkMa.containsMouse ? window.base : window.text }
+                                Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: 14; color: schLinkMa.containsMouse ? window.base : window.text }
                             }
                             
                             MouseArea {
@@ -938,7 +938,7 @@ Item {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             height: 2
-                            color: "#1affffff"
+                            color: Qt.alpha(window.surface1, 0.4)
                             visible: window.scheduleData && window.scheduleData.lessons.length > 0
                         }
 
@@ -1032,7 +1032,7 @@ Item {
                                                     text: modelData.subject || ""
                                                     font.family: "JetBrains Mono"
                                                     font.weight: Font.Black
-                                                    font.pixelSize: 15
+                                                    font.pixelSize: 16
                                                     color: classNode.isActive ? window.mauve : (classNode.isPast ? window.overlay0 : window.text)
                                                     elide: Text.ElideRight
                                                     Layout.fillWidth: true
@@ -1041,15 +1041,15 @@ Item {
                                                 RowLayout {
                                                     visible: !modelData.is_compact
                                                     spacing: 8
-                                                    Text { text: "󰅐"; font.family: "Iosevka Nerd Font"; font.pixelSize: 13; color: classNode.isActive ? window.mauve : window.overlay1 }
-                                                    Text { text: modelData.time || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 12; color: classNode.isActive ? window.text : window.overlay1 }
+                                                    Text { text: "󰅐"; font.family: "Iosevka Nerd Font"; font.pixelSize: 14; color: classNode.isActive ? window.mauve : window.overlay1 }
+                                                    Text { text: modelData.time || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 14; color: classNode.isActive ? window.text : window.overlay1 }
                                                 }
 
                                                 RowLayout {
                                                     visible: !modelData.is_compact && (modelData.room || "") !== ""
                                                     spacing: 8
-                                                    Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: 13; color: classNode.isPast ? window.surface2 : window.peach }
-                                                    Text { text: modelData.room || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 11; color: window.subtext1; elide: Text.ElideRight; Layout.fillWidth: true }
+                                                    Text { text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: 14; color: classNode.isPast ? window.surface2 : window.peach }
+                                                    Text { text: modelData.room || ""; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: 14; color: window.subtext1; elide: Text.ElideRight; Layout.fillWidth: true }
                                                 }
                                             }
 
@@ -1089,7 +1089,7 @@ Item {
                                                     text: modelData.desc || ""
                                                     font.family: "JetBrains Mono"
                                                     font.weight: Font.Bold
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 14
                                                     color: window.mauve
                                                 }
                                             }

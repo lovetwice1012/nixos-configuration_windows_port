@@ -275,6 +275,25 @@ def dump_state_to_json(c):
             "percent": round(percentage, 1)
         })
 
+    # --- NEW: Week Apps ---
+    c.execute('''
+        SELECT app_class, COALESCE(app_title, app_class), SUM(seconds) as secs 
+        FROM focus_log 
+        WHERE log_date >= ? AND log_date <= ? 
+        GROUP BY app_class 
+        ORDER BY secs DESC LIMIT 50
+    ''', (monday.isoformat(), sunday.isoformat()))
+    week_apps_rows = c.fetchall()
+    week_apps_total = sum([r[2] for r in week_apps_rows])
+    week_apps = []
+    for r in week_apps_rows:
+        cls, title, secs = r
+        pct = (secs / week_apps_total) * 100 if week_apps_total > 0 else 0
+        week_apps.append({
+            "class": cls, "name": title, "icon": get_app_icon(cls),
+            "seconds": secs, "percent": round(pct, 1)
+        })
+
     monday_iter = target_date - timedelta(days=target_date.weekday())
     days_str = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     week_data = []
@@ -318,6 +337,23 @@ def dump_state_to_json(c):
     except sqlite3.OperationalError:
         pass 
 
+    # --- NEW: Week Heatmap (7x24) ---
+    week_heatmap = [[0]*24 for _ in range(7)]
+    try:
+        c.execute('''
+            SELECT log_date, hour, SUM(seconds)
+            FROM focus_hourly
+            WHERE log_date >= ? AND log_date <= ?
+            GROUP BY log_date, hour
+        ''', (monday.isoformat(), sunday.isoformat()))
+        for row in c.fetchall():
+            ldate, hr, secs = row
+            day_idx = date.fromisoformat(ldate).weekday()
+            if 0 <= hr <= 23:
+                week_heatmap[day_idx][hr] += secs
+    except sqlite3.OperationalError:
+        pass
+
     result = {
         "selected_date": target_date.isoformat(),
         "total": total_seconds,
@@ -326,9 +362,11 @@ def dump_state_to_json(c):
         "yesterday": yesterday_seconds,
         "current": current_app_title,
         "apps": all_apps,
+        "week_apps": week_apps,
         "week": week_data,
         "month": month_data,
-        "hourly": hourly_data
+        "hourly": hourly_data,
+        "week_heatmap": week_heatmap
     }
     
     temp_file = STATE_FILE + ".tmp"

@@ -423,7 +423,7 @@ Item {
                     anchors.fill: parent
                     source: root.musicData.blur ? "file://" + root.musicData.blur : ""
                     fillMode: Image.PreserveAspectCrop
-                    opacity: status === Image.Ready ? 0.6 : 0.0
+                    opacity: status === Image.Ready ? 0.9 : 0.0
                     Behavior on opacity { NumberAnimation { duration: 800; easing.type: Easing.InOutQuad } }
                 }
 
@@ -432,7 +432,7 @@ Item {
                     width: parent.width * 0.8; height: width; radius: width / 2
                     x: (parent.width / 2 - width / 2) + Math.cos(root.globalOrbitAngle * 2) * 150
                     y: (parent.height / 2 - height / 2) + Math.sin(root.globalOrbitAngle * 2) * 100
-                    opacity: root.musicData.status === "Playing" ? 0.12 : 0.04
+                    opacity: root.musicData.status === "Playing" ? 0.08 : 0.04
                     color: root.musicData.status === "Playing" ? root.mauve : root.surface2
                     Behavior on color { ColorAnimation { duration: 1000 } }
                     Behavior on opacity { NumberAnimation { duration: 1000 } }
@@ -527,6 +527,16 @@ Item {
                                     opacity: artImg.status === Image.Ready ? 1.0 : 0.0
                                     Behavior on opacity { NumberAnimation { duration: 800 } }
                                 }
+                                
+                                // NEW: Dimmed slightly by tinting with the primary mauve accent, as requested
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: width / 2
+                                    color: Qt.rgba(root.mauve.r, root.mauve.g, root.mauve.b, 0.2)
+                                    opacity: artImg.status === Image.Ready ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 800 } }
+                                }
+
                                 Rectangle {
                                     width: 40; height: 40
                                     radius: 20; color: "#000000"
@@ -657,7 +667,8 @@ Item {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 6
-                                        color: "#CC000000"
+                                        // Dynamic tint: surface0 with 70% opacity for a softer dark look
+                                        color: Qt.rgba(root.surface0.r, root.surface0.g, root.surface0.b, 0.7)
 
                                         layer.enabled: true
                                         layer.effect: MultiEffect {
@@ -999,7 +1010,9 @@ Item {
                                                 implicitHeight: 150
                                                 width: 10; height: eqSlider.availableHeight
                                                 radius: 5; 
-                                                color: "#CC000000"
+                                                
+                                                // Dynamic tint: surface0 with 70% opacity for a softer dark look
+                                                color: Qt.rgba(root.surface0.r, root.surface0.g, root.surface0.b, 0.7)
 
                                                 layer.enabled: true
                                                 layer.effect: MultiEffect {
