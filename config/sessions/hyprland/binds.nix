@@ -37,14 +37,15 @@
       ", Print, exec, ~/.config/hypr/scripts/screenshot.sh"
       "SHIFT_L, Print, exec, ~/.config/hypr/scripts/screenshot.sh --edit"
       
-      ", XF86PowerOff, exec, quickshell -p ~/.config/hypr/scripts/quickshell/Lock.qml"
+      ", XF86PowerOff, exec, bash ~/.config/hypr/scripts/lock.sh"
     ];
     
     bindel = [
       ", xf86audiolowervolume, exec, swayosd-client --output-volume lower"
       ", xf86audioraisevolume, exec, swayosd-client --output-volume raise"
       
-      "$mainMod, L, exec, quickshell -p ~/.config/hypr/scripts/quickshell/Lock.qml"  
+      "$mainMod, L, exec, bash ~/.config/hypr/scripts/lock.sh" 
+			 
     ];
     
     bind = [    
