@@ -1,4 +1,5 @@
 Previews of my desktop
+You can find all of my wallpapers [HERE](https://github.com/ilyamiro/shell-wallpapers)
 
 ![preview1](previews/screenshot1.png)
 ![preview2](previews/screenshot2.png)
