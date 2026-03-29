@@ -2,6 +2,9 @@
 
 ### You can find all of my wallpapers **[HERE](https://github.com/ilyamiro/shell-wallpapers)**.
 
+#### Update 30.03.26
+As of now, due to an increased demand, I am working on installation scripts. The first version will be out in the span of the next 7 days. Thank you for your support!
+
 ---
 
 ![preview1](previews/screenshot1.png)
