@@ -1,0 +1,210 @@
+/* ============================================================================
+   モニター管理ウィジェット — MonitorPopup.qml のリッチなドラッグ配置UIを再現
+   スクリーンショット8: マルチモニタートポロジエディタ
+   ============================================================================ */
+
+.monitors-widget {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: radial-gradient(ellipse at bottom, rgba(50, 60, 80, 0.5), var(--base));
+}
+
+/* ── ヘッダー ── */
+.mon-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    z-index: 10;
+}
+
+.mon-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.mon-title-icon {
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 28px;
+    color: var(--sapphire);
+}
+
+.mon-apply-btn {
+    padding: 10px 20px;
+    border-radius: 12px;
+    background: var(--sapphire);
+    color: var(--base);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 4px 15px rgba(116, 199, 236, 0.3);
+}
+
+.mon-apply-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(116, 199, 236, 0.5);
+    background: #89b4fa;
+}
+
+.mon-apply-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 10px rgba(116, 199, 236, 0.3);
+}
+
+/* ── レイアウトエディタ領域 (中央) ── */
+.mon-workspace-wrap {
+    flex: 1;
+    position: relative;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 20px;
+    border: 1px inset rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    margin-bottom: 20px;
+}
+
+/* グリッド線の背景 */
+.mon-workspace {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center center;
+}
+
+/* ドラッグ可能なディスプレイ矩形 */
+.mon-screen {
+    position: absolute;
+    background: rgba(30,30,46, 0.85); /* base */
+    border: 2px solid var(--overlay0);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.3s;
+    user-select: none;
+    backdrop-filter: blur(8px);
+}
+
+.mon-screen:active {
+    cursor: grabbing;
+}
+
+.mon-screen.primary {
+    border-color: var(--green);
+}
+
+.mon-screen.selected {
+    border-color: var(--sapphire) !important;
+    box-shadow: 0 0 30px rgba(116, 199, 236, 0.4);
+    background: rgba(49,50,68, 0.95); /* mantle */
+    z-index: 100 !important;
+}
+
+.mon-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.1);
+    position: absolute;
+    z-index: 0;
+}
+.mon-screen.selected .mon-id {
+    color: rgba(116, 199, 236, 0.15); /* sapphire tint */
+}
+
+.mon-label {
+    position: relative;
+    z-index: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.mon-res {
+    position: relative;
+    z-index: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--subtext0);
+}
+
+/* ドラッグ中の吸着ガイド線 */
+.mon-snap-guide-x, .mon-snap-guide-y {
+    position: absolute;
+    background: var(--pink);
+    opacity: 0;
+    transition: opacity 0.1s;
+    pointer-events: none;
+    z-index: 50;
+}
+
+.mon-snap-guide-x { width: 1px; height: 100%; top: 0; }
+.mon-snap-guide-y { height: 1px; width: 100%; left: 0; }
+
+/* ── 下部プロパティパネル ── */
+.mon-props-panel {
+    display: flex;
+    gap: 15px;
+    height: 120px;
+    transform: translateY(150px);
+    opacity: 0;
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mon-props-panel.visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.mon-prop-card {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.mon-prop-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--subtext0);
+    text-transform: uppercase;
+    margin-bottom: auto;
+}
+
+.mon-prop-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--sapphire);
+}
+
+.mon-prop-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--overlay0);
+    margin-top: 4px;
+}

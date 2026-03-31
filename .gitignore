@@ -5,3 +5,9 @@
 
 commit.txt
 config/programs/eww/hotfile-eww/*
+/*.txt
+node_modules
+Release
+build
+*.log
+build_err.txt

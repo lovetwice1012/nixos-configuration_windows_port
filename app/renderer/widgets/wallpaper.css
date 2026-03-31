@@ -1,0 +1,126 @@
+/* ============================================================================
+   壁紙ピッカーウィジェット — WallpaperPicker.qml スタイル再現
+   スクリーンショット6: 3Dパースペクティブカルーセル
+   ============================================================================ */
+.wallpaper-widget { display: flex; flex-direction: column; height: 100%; gap: 16px; }
+
+.wallpaper-toolbar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 8px 16px; background: rgba(var(--base-rgb), 0.9);
+    border-radius: 16px; align-self: center;
+}
+.wallpaper-tool-btn {
+    width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease; border: 2px solid transparent;
+}
+.wallpaper-tool-btn:hover { transform: scale(1.1); }
+.wallpaper-tool-btn.mode-btn { background: var(--surface0); font-family: 'Iosevka Nerd Font', monospace; font-size: 14px; color: var(--text); }
+.wallpaper-tool-btn.color-swatch { border-radius: 6px; }
+
+.wallpaper-carousel {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    perspective: 1200px; overflow: hidden; position: relative;
+}
+
+.wallpaper-track {
+    display: flex; gap: 12px; align-items: center;
+    transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wallpaper-card {
+    width: 220px; height: 350px; border-radius: 16px; overflow: hidden;
+    cursor: pointer; transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3); flex-shrink: 0;
+    border: 2px solid transparent; position: relative;
+}
+.wallpaper-card:hover { transform: scale(1.05); border-color: rgba(var(--mauve-rgb), 0.5); }
+.wallpaper-card.active { border-color: var(--mauve); box-shadow: 0 0 20px rgba(var(--mauve-rgb), 0.3); }
+.wallpaper-card img { width: 100%; height: 100%; object-fit: cover; }
+.wallpaper-card-overlay {
+    position: absolute; bottom: 0; left: 0; right: 0; padding: 8px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    font-size: 10px; color: white; text-align: center;
+    opacity: 0; transition: opacity 0.2s ease;
+}
+.wallpaper-card:hover .wallpaper-card-overlay { opacity: 1; }
+
+.wallpaper-nav-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(var(--base-rgb), 0.8); border: 1px solid var(--surface1);
+    color: var(--text); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease; z-index: 10;
+}
+.wallpaper-nav-btn:hover { background: var(--surface1); }
+.wallpaper-nav-btn.prev { left: 16px; }
+.wallpaper-nav-btn.next { right: 16px; }
+
+/* ============================================================================
+   フォーカスタイムウィジェット — FocusTimePopup.qml スタイル再現
+   スクリーンショット7: 日/週使用時間 + アプリ別統計
+   ============================================================================ */
+.focustime-widget { display: flex; flex-direction: column; height: 100%; gap: 16px; }
+
+.ft-header {
+    display: flex; align-items: center; justify-content: space-between;
+}
+.ft-nav { display: flex; align-items: center; gap: 12px; }
+.ft-nav-btn { font-size: 16px; color: var(--overlay2); cursor: pointer; transition: color 0.2s ease; background: none; border: none; }
+.ft-nav-btn:hover { color: var(--text); }
+.ft-home-btn { font-family: 'Iosevka Nerd Font', monospace; font-size: 18px; color: var(--overlay2); cursor: pointer; background: none; border: none; }
+.ft-day-label { font-size: 16px; font-weight: 800; color: var(--text); }
+
+/* 統計カード */
+.ft-stats-row { display: flex; gap: 12px; }
+.ft-stat-card {
+    flex: 1; background: var(--surface0); border-radius: 14px;
+    padding: 14px 18px; text-align: center;
+}
+.ft-stat-sublabel { font-size: 11px; color: var(--subtext0); }
+.ft-stat-value { font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
+.ft-stat-card.highlight { background: rgba(var(--green-rgb), 0.1); border: 1px solid rgba(var(--green-rgb), 0.2); }
+.ft-stat-card.highlight .ft-stat-value { color: var(--green); font-size: 36px; }
+
+/* バーチャート */
+.ft-charts-row { display: flex; gap: 16px; }
+.ft-bar-chart {
+    flex: 1; background: var(--surface0); border-radius: 14px; padding: 16px;
+    display: flex; align-items: flex-end; justify-content: space-around; gap: 8px; height: 160px;
+}
+.ft-bar { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+.ft-bar-fill {
+    width: 100%; border-radius: 6px; background: var(--surface1);
+    transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ft-bar-fill.today { background: var(--green); }
+.ft-bar-label { font-size: 10px; color: var(--overlay0); }
+
+/* 月間ヒートマップ */
+.ft-heatmap {
+    flex: 1; background: var(--surface0); border-radius: 14px; padding: 16px;
+}
+.ft-heatmap-title { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.ft-heatmap-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+}
+.ft-heatmap-cell {
+    aspect-ratio: 1; border-radius: 3px; background: var(--surface1);
+    transition: background 0.2s ease;
+}
+.ft-heatmap-cell.l1 { background: rgba(var(--green-rgb), 0.2); }
+.ft-heatmap-cell.l2 { background: rgba(var(--green-rgb), 0.4); }
+.ft-heatmap-cell.l3 { background: rgba(var(--green-rgb), 0.6); }
+.ft-heatmap-cell.l4 { background: rgba(var(--green-rgb), 0.8); }
+.ft-heatmap-cell.l5 { background: var(--green); }
+
+/* アプリ使用率 */
+.ft-app-list { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.ft-app-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.ft-app-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--surface0); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.ft-app-info { flex: 1; }
+.ft-app-name { font-size: 13px; font-weight: 800; }
+.ft-app-time { font-size: 12px; color: var(--subtext0); float: right; }
+.ft-app-bar { height: 4px; border-radius: 2px; background: var(--surface0); margin-top: 4px; }
+.ft-app-bar-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width 0.5s ease; }

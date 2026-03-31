@@ -1,0 +1,15 @@
+{
+  "name": "nixos-desktop-port",
+  "version": "1.0.0",
+  "description": "NixOS Hyprland Desktop Environment ported to Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "author": "ilyamiro",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "31.7.7"
+  }
+}

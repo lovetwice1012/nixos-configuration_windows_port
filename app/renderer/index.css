@@ -1,0 +1,530 @@
+/* ============================================================================
+   NixOS Desktop Port — デザインシステム
+   Catppuccin Mocha テーマ + TopBar.qml のスタイルを完全再現
+   ============================================================================ */
+
+/* ── フォント読み込み ── */
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('../assets/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+    font-weight: 400 800;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Iosevka Nerd Font';
+    src: url('../assets/fonts/SymbolsNerdFont-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+/* ── CSS変数（Catppuccin Mocha） ── */
+:root {
+    --rosewater: #f5e0dc; --flamingo: #f2cdcd; --pink: #f5c2e7;
+    --mauve: #cba6f7; --red: #f38ba8; --maroon: #eba0ac;
+    --peach: #fab387; --yellow: #f9e2af; --green: #a6e3a1;
+    --teal: #94e2d5; --sky: #89dceb; --sapphire: #74c7ec;
+    --blue: #89b4fa; --lavender: #b4befe; --text: #cdd6f4;
+    --subtext1: #bac2de; --subtext0: #a6adc8;
+    --overlay2: #9399b2; --overlay1: #7f849c; --overlay0: #6c7086;
+    --surface2: #585b70; --surface1: #45475a; --surface0: #313244;
+    --base: #1e1e2e; --mantle: #181825; --crust: #11111b;
+
+    /* RGB分解（rgba()用） */
+    --base-rgb: 30, 30, 46;
+    --surface0-rgb: 49, 50, 68;
+    --surface1-rgb: 69, 71, 90;
+    --surface2-rgb: 88, 91, 112;
+    --text-rgb: 205, 214, 244;
+    --mauve-rgb: 203, 166, 247;
+    --blue-rgb: 137, 180, 250;
+    --green-rgb: 166, 227, 161;
+    --red-rgb: 243, 139, 168;
+    --yellow-rgb: 249, 226, 175;
+    --peach-rgb: 250, 179, 135;
+    --crust-rgb: 17, 17, 27;
+
+    /* グラデーション */
+    --gradient-wifi: linear-gradient(135deg, rgba(var(--green-rgb), 0.3), rgba(var(--blue-rgb), 0.3));
+    --gradient-bt: linear-gradient(135deg, rgba(var(--blue-rgb), 0.3), rgba(var(--mauve-rgb), 0.3));
+    --gradient-vol: linear-gradient(to right, var(--sapphire), var(--blue));
+    --gradient-mauve-blue: linear-gradient(to right, var(--mauve), var(--blue));
+}
+
+/* ── リセット ── */
+*, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
+}
+
+body {
+    font-family: 'JetBrains Mono', monospace;
+    background: transparent;
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: no-drag;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* ── トップバー全体 ── */
+.top-bar {
+    width: calc(100vw - 8px);
+    height: 48px;
+    margin: 8px 4px 0 4px; /* margins { top: 8; bottom: 0; left: 4; right: 4 } */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+/* ── 左/中央/右レイアウト ── */
+.left-layout, .center-layout, .right-layout {
+    display: flex;
+    align-items: center;
+    gap: 4px; /* reduced gap to match spacing: 4 */
+    height: 100%;
+}
+
+/* ── 汎用ピル（ボタン背景共通） ── */
+.pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px; /* Layout.preferredHeight: parent.moduleHeight (48) */
+    background: rgba(var(--base-rgb), 0.75);
+    border: 1px solid rgba(var(--text-rgb), 0.05);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.pill.square {
+    width: 48px; /* Layout.preferredWidth: 48 */
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 24px; /* Search is 24, Notifications is 18 */
+}
+
+.pill:hover {
+    background: rgba(var(--surface1-rgb), 0.95);
+    border-color: rgba(var(--text-rgb), 0.15);
+    transform: scale(1.05);
+}
+
+.pill.search-pill { color: var(--text); font-size: 24px; }
+.pill.search-pill:hover { color: var(--blue); }
+
+.pill.notif-pill { color: var(--text); font-size: 18px; }
+.pill.notif-pill:hover { color: var(--yellow); }
+
+/* ── ワークスペース ── */
+.workspaces-box {
+    display: flex;
+    align-items: center;
+    gap: 6px; /* spacing: 6 */
+    background: rgba(var(--base-rgb), 0.75);
+    border: 1px solid rgba(var(--text-rgb), 0.05);
+    border-radius: 14px;
+    padding: 0 10px;
+    height: 48px; /* match moduleHeight */
+    overflow: hidden;
+    transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
+}
+
+.workspace-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--overlay0);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(1.0) translateY(15px); /* Start hidden below for animation */
+    opacity: 0;
+}
+
+.workspace-pill.show {
+    transform: scale(1.0) translateY(0);
+    opacity: 1;
+}
+
+.workspace-pill.empty {
+    color: var(--overlay0);
+    font-weight: 500;
+}
+
+.workspace-pill.occupied {
+    color: var(--text);
+    font-weight: 700; /* Font.Bold */
+}
+
+.workspace-pill.active {
+    background: var(--mauve);
+    color: var(--crust);
+    font-weight: 900; /* Font.Black */
+}
+
+.workspace-pill:hover:not(.active) {
+    background: rgba(var(--surface2-rgb), 0.9);
+    color: var(--text);
+    transform: scale(1.08);
+}
+
+/* ── メディア情報 ── */
+.media-box {
+    display: flex;
+    align-items: center;
+    background: rgba(var(--base-rgb), 0.75);
+    border: 1px solid rgba(var(--text-rgb), 0.05);
+    border-radius: 14px;
+    height: 48px;
+    padding: 0;
+    cursor: pointer;
+    transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s;
+    overflow: hidden;
+    max-width: 0; /* Animated by JS */
+    opacity: 0;
+}
+
+.media-box.showing {
+    padding: 0 12px;
+    opacity: 1;
+    /* max-width will be set dynamically via JS inline style or class toggle */
+}
+
+/* Interior parallax effect wrapper */
+.media-content-parallax {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: max-content;
+    transform: translateX(-20px);
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.media-box.showing .media-content-parallax {
+    transform: translateX(0);
+}
+
+.media-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.media-info:hover {
+    transform: scale(1.02);
+}
+
+.media-art {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--surface1);
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    transition: border 0.2s;
+}
+
+.media-box.playing .media-art {
+    border: 1px solid var(--mauve);
+}
+
+.media-art-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.media-art-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(var(--mauve-rgb), 0.2);
+}
+
+.media-text {
+    display: flex;
+    flex-direction: column;
+    width: 15vw; /* Layout.preferredWidth: 180 roughly */
+    max-width: 180px;
+    gap: 2px;
+}
+
+.media-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.media-artist {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--subtext0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 中央の時計 ── */
+.center-box {
+    display: flex;
+    flex-direction: row; /* QML: RowLayout */
+    align-items: center;
+    justify-content: center;
+    gap: 24px; /* QML: spacing 24 */
+    cursor: pointer;
+    background: rgba(var(--base-rgb), 0.75);
+    border: 1px solid rgba(var(--text-rgb), 0.05);
+    border-radius: 14px;
+    height: 48px;
+    padding: 0 16px;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    width: max-content;
+}
+
+.center-box:hover {
+    background: rgba(var(--surface1-rgb), 0.95);
+    border-color: rgba(var(--text-rgb), 0.15);
+    transform: scale(1.03); /* QML says 1.03 for hover */
+}
+
+/* ── 時計 ── */
+.clock-box {
+    display: flex;
+    flex-direction: column;
+    gap: -2px; /* QML spacing: -2 */
+    line-height: 1.1;
+}
+
+.top-clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 900; /* Font.Black */
+    color: var(--blue);
+}
+
+.top-date {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--subtext0);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── 天気 ── */
+.weather-box {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px; /* QML spacing: 8 */
+}
+
+.top-weather-icon {
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 24px;
+    color: var(--mauve); /* Will be tinted by JS */
+}
+
+.top-weather-temp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    font-weight: 900; /* Font.Black */
+    color: var(--peach);
+}
+
+/* ── システムステータス（右側） ── */
+.sys-group {
+    display: flex;
+    align-items: center;
+    background: rgba(var(--base-rgb), 0.75);
+    border: 1px solid rgba(var(--text-rgb), 0.05);
+    border-radius: 14px;
+    height: 48px;
+    padding: 0 6px;
+    gap: 4px;
+}
+
+.sub-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    height: 36px;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sub-pill:hover {
+    background: rgba(var(--surface0-rgb), 0.8);
+    transform: scale(1.05);
+}
+
+.pill-icon {
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 16px;
+    color: var(--text);
+}
+
+.media-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.media-btn {
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 26px;
+    color: var(--overlay2);
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    line-height: 1;
+}
+
+.media-btn:hover {
+    color: var(--text);
+    transform: scale(1.1);
+}
+
+.media-btn.play-btn {
+    font-size: 30px;
+}
+
+.media-btn.play-btn:hover {
+    color: var(--green);
+    transform: scale(1.15);
+}
+
+/* ── センターボックス（時計 + 天気） ── */
+.center-box {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 0 18px;
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.center-box:hover {
+    transform: scale(1.03);
+}
+
+.clock-box {
+    display: flex;
+    flex-direction: column;
+    gap: -2px;
+}
+
+.clock-time {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--blue);
+    letter-spacing: 0.5px;
+}
+
+.clock-date {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--subtext0);
+}
+
+.weather-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weather-icon {
+    font-family: 'Iosevka Nerd Font', monospace;
+    font-size: 24px;
+    transition: color 0.3s ease;
+}
+
+.weather-temp {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--peach);
+}
+
+/* ── システムトレイ ── */
+.tray-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+}
+
+.tray-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 0.8;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+}
+
+.tray-icon:hover {
+    opacity: 1;
+    transform: scale(1.15);
+}
+
+/* ── バッテリーピル ── */
+.battery-pill .pill-icon {
+    transition: color 0.3s ease;
+}
+
+.battery-pill .pill-label {
+    font-size: 13px;
+    font-weight: 800;
+    transition: color 0.3s ease;
+}
+
+/* ── 入場アニメーション ── */
+.entrance-left {
+    opacity: 0;
+    transform: translateX(-30px);
+    transition: opacity 0.6s cubic-bezier(0.33, 1, 0.68, 1), transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.entrance-center {
+    opacity: 0;
+    transform: translateY(-30px);
+    transition: opacity 0.6s cubic-bezier(0.33, 1, 0.68, 1), transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.entrance-right {
+    opacity: 0;
+    transform: translateX(30px);
+    transition: opacity 0.6s cubic-bezier(0.33, 1, 0.68, 1), transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.entrance-left.show, .entrance-center.show, .entrance-right.show {
+    opacity: 1;
+    transform: translate(0, 0);
+}
+
+/* ── ワークスペースカスケードアニメーション ── */
+.workspace-pill.cascade {
+    opacity: 0;
+    transform: translateY(15px);
+    transition: opacity 0.5s cubic-bezier(0.33, 1, 0.68, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease, color 0.25s ease;
+}
+
+.workspace-pill.cascade.show {
+    opacity: 1;
+    transform: translateY(0);
+}

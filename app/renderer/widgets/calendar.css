@@ -1,0 +1,343 @@
+/* ============================================================================
+   カレンダー＆天気ダッシュボード — CalendarPopup.qml 完全再現
+   Layout: Left(Calendar) | Center(Clock+Orbit) | Right(Weather) | Bottom(Schedule)
+   ============================================================================ */
+
+.cal-widget {
+    position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 20px;
+    background: var(--base);
+    border: 1px solid var(--surface0);
+}
+
+/* ── 入場アニメ ── */
+.cal-widget { animation: introMain 0.8s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }
+@keyframes introMain { from { opacity: 0; transform: translateY(15px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* =======================================================
+   AMBIENT BACKGROUND BLOBS (3 floating gradient spheres)
+   ======================================================= */
+.cal-ambient-blobs {
+    position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; border-radius: 20px;
+}
+.ambient-blob {
+    position: absolute; border-radius: 50%; filter: blur(100px); mix-blend-mode: screen;
+    transition: background-color 1s ease;
+}
+.ambient-blob.weather { width: 50%; aspect-ratio: 1; top: -10%; right: -5%; opacity: 0.025; }
+.ambient-blob.time    { width: 60%; aspect-ratio: 1; bottom: -15%; left: -10%; opacity: 0.02; }
+.ambient-blob.accent  { width: 45%; aspect-ratio: 1; top: 15%; left: 25%; opacity: 0.015; }
+
+/* Big Parallax Weather Icon (background) */
+.cal-bg-weather-icon {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -65%);
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 600px;
+    opacity: 0.03; z-index: 2; pointer-events: none;
+    transition: color 1.5s ease;
+    animation: icon-drift 12s infinite ease-in-out alternate;
+}
+@keyframes icon-drift { 0% { transform: translate(-50%, -65%); } 100% { transform: translate(-50%, -85px) translateX(10px); } }
+
+/* =======================================================
+   CENTRAL HERO: BREATHING TIME HUB & 3D HOURLY ORBIT
+   ======================================================= */
+.cal-hero-section {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 240px; /* Leave room for bottom schedule */
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5; pointer-events: none;
+}
+
+.cal-hero-hub {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    animation: levitate 8s infinite ease-in-out;
+    /* intro */ opacity: 0; transform: translateY(25px) scale(0.85);
+    transition: opacity 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cal-hero-hub.show { opacity: 1; transform: translateY(0) scale(1); }
+
+@keyframes levitate { 0%, 100% { margin-top: 0; } 50% { margin-top: -15px; } }
+
+/* Dashed Ellipse Orbit Ring (Canvas draws it, but we also size the container) */
+.cal-orbit-canvas {
+    position: absolute; width: 640px; height: 280px;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: -1; opacity: 0.25; pointer-events: none;
+}
+
+/* Hero Clock */
+.cal-hero-time-row { display: flex; align-items: baseline; gap: 2px; justify-content: center; }
+.cal-hero-clock {
+    font-size: 84px; font-weight: 900; color: var(--text); font-family: 'JetBrains Mono', monospace;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4); line-height: 1;
+}
+.cal-hero-seconds {
+    font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+    color: var(--blue); line-height: 1; vertical-align: bottom; margin-bottom: 15px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: color 1s ease;
+}
+.cal-hero-seconds.pulse { animation: sec-pulse 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes sec-pulse { 0% { transform: scale(1.06); } 100% { transform: scale(1.0); } }
+
+.cal-hero-date {
+    font-size: 16px; font-weight: 700; color: var(--subtext0); margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; opacity: 0.9;
+}
+
+/* ── Orbital Hourly Forecast Pills ── */
+.cal-orbit-container {
+    position: absolute; top: 50%; left: 50%; width: 0; height: 0; z-index: 10; pointer-events: none;
+}
+.cal-orbit-item {
+    position: absolute; transform-origin: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 56px; height: 95px; /* QML: 56×95 */
+    background: rgba(var(--surface0-rgb), 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255, 0.06); border-radius: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25); pointer-events: auto; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+.cal-orbit-item:hover { border-color: var(--overlay0); background: var(--surface2); }
+.cal-orbit-item.active-hour {
+    background: var(--blue); border-color: transparent;
+    transform-origin: center; /* QML: scale 1.4 is applied by JS */
+}
+
+.cal-orbit-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--overlay1); }
+.cal-orbit-item.active-hour .cal-orbit-time { color: var(--base); }
+
+.cal-orbit-icon { font-family: 'Iosevka Nerd Font', monospace; font-size: 18px; margin: 4px 0; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.cal-orbit-item:hover .cal-orbit-icon { transform: translateY(-3px); }
+.cal-orbit-item.active-hour .cal-orbit-icon { color: var(--base) !important; }
+
+.cal-orbit-temp { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 900; color: var(--text); }
+.cal-orbit-item.active-hour .cal-orbit-temp { color: var(--base); }
+
+/* =======================================================
+   LEFT WING: FLOATING GLASS CALENDAR (matches QML exactly)
+   ======================================================= */
+.cal-glass-calendar {
+    position: absolute; left: 40px; top: 40px;
+    width: 280px; height: auto;
+    background: rgba(var(--surface0-rgb), 0.2); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(var(--surface1-rgb), 0.4);
+    border-radius: 14px; padding: 25px;
+    z-index: 10; pointer-events: auto;
+    font-family: 'JetBrains Mono', monospace;
+    /* intro */ opacity: 0; transform: translateX(-40px);
+    transition: opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1), transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cal-glass-calendar.show { opacity: 1; transform: translateX(0); }
+
+.cal-glass-cal-header { display: flex; align-items: center; gap: 4px; margin-bottom: 15px; }
+.cal-glass-month { flex: 1; text-align: center; font-size: 16px; font-weight: 900; color: var(--text); letter-spacing: 1.5px; }
+.cal-glass-nav-btn {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 16px; color: var(--text); cursor: pointer;
+    width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; transition: background 0.15s;
+}
+.cal-glass-nav-btn:hover { background: var(--surface1); }
+#cal-glass-home { font-size: 16px; transition: opacity 0.2s; }
+
+.cal-glass-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+    margin-bottom: 6px; font-size: 14px; font-weight: 900; color: var(--overlay0);
+}
+.cal-glass-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-glass-day {
+    display: flex; align-items: center; justify-content: center;
+    aspect-ratio: 1; border-radius: 10px;
+    font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer;
+    transition: all 0.15s; border: 1px solid transparent; background: transparent;
+}
+.cal-glass-day:hover:not(.other-month) {
+    background: rgba(var(--surface2-rgb), 0.4); border-color: var(--overlay0); transform: scale(1.2);
+}
+.cal-glass-day.other-month { color: var(--surface0); cursor: default; }
+.cal-glass-day.today {
+    font-weight: 900; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: var(--surface0); /* color set by JS time-of-day */
+}
+
+/* =======================================================
+   RIGHT WING: ORGANIC FLOATING WEATHER STATS
+   ======================================================= */
+.cal-weather-section {
+    position: absolute; right: 40px; top: 40px;
+    width: 320px;
+    z-index: 10; pointer-events: auto;
+    display: flex; flex-direction: column; gap: 20px;
+    /* intro */ opacity: 0; transform: translateX(40px);
+    transition: opacity 0.85s cubic-bezier(0.22, 1, 0.36, 1), transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cal-weather-section.show { opacity: 1; transform: translateX(0); }
+
+/* Day Navigation */
+.cal-weather-nav {
+    display: flex; align-items: center; justify-content: flex-end; gap: 20px;
+}
+.cal-weather-nav-btn {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 18px; color: var(--overlay1);
+    cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s; border: none; background: none;
+}
+.cal-weather-nav-btn:hover { color: var(--blue); }
+.cal-weather-day-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 900; color: var(--text);
+}
+
+/* Big Temp Display */
+.cal-weather-temp-block {
+    display: flex; flex-direction: column; align-items: flex-end; gap: -5px;
+}
+.cal-weather-big-temp {
+    font-family: 'JetBrains Mono', monospace; font-size: 84px; font-weight: 900;
+    color: var(--text); line-height: 1;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: color 0.3s, text-shadow 0.3s;
+}
+.cal-weather-big-temp.heating { color: var(--red); text-shadow: 0 0 30px rgba(243, 139, 168, 0.6); }
+.cal-weather-big-temp.cooling { color: var(--blue); text-shadow: 0 0 30px rgba(137, 180, 250, 0.6); }
+
+.cal-weather-desc {
+    font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700;
+    transition: color 1s; text-align: right;
+}
+
+/* 4× Circular Gauge Row */
+.cal-weather-gauges {
+    display: flex; gap: 20px; justify-content: flex-end; margin-top: auto;
+}
+.cal-gauge-item {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; width: 68px;
+    cursor: pointer; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cal-gauge-item:hover { transform: scale(1.15); }
+
+.cal-gauge-circle {
+    position: relative; width: 68px; height: 68px;
+}
+.cal-gauge-circle canvas { width: 100%; height: 100%; }
+.cal-gauge-value {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 900; color: var(--text);
+}
+.cal-gauge-label {
+    display: flex; align-items: center; gap: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--overlay0);
+}
+.cal-gauge-label .gauge-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 14px;
+    transition: color 0.2s;
+}
+.cal-gauge-item:hover .gauge-icon { color: var(--blue); }
+
+/* =======================================================
+   BOTTOM SECTION: FRAMELESS FLUID DATA STREAM (SCHEDULE)
+   ======================================================= */
+.cal-schedule-section {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 240px;
+    z-index: 20; pointer-events: auto;
+    /* intro */ opacity: 0; transform: translateY(50px);
+    transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cal-schedule-section.show { opacity: 1; transform: translateY(0); }
+
+/* Gradient overlay */
+.cal-schedule-gradient {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, rgba(var(--crust-rgb, 17,17,27), 0.6));
+}
+.cal-schedule-divider {
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: rgba(var(--surface1-rgb), 0.5);
+}
+
+/* Sine Wave Canvas */
+.cal-schedule-waves {
+    position: absolute; inset: 0; z-index: -1; opacity: 0.15; pointer-events: none;
+}
+
+/* Schedule Content */
+.cal-schedule-content {
+    position: relative; z-index: 1; padding: 25px; height: 100%; display: flex; flex-direction: column; gap: 15px;
+}
+
+.cal-schedule-header {
+    display: flex; align-items: center; gap: 15px;
+}
+.cal-schedule-icon-bubble {
+    width: 40px; height: 40px; border-radius: 20px; background: var(--surface0);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 18px;
+}
+.cal-schedule-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--overlay0);
+    flex: 1;
+}
+.cal-schedule-link {
+    display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 10px;
+    background: rgba(var(--surface1-rgb), 0.5); border: 1px solid var(--mauve);
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text);
+    cursor: pointer; transition: all 0.15s;
+}
+.cal-schedule-link:hover { background: var(--mauve); color: var(--base); }
+.cal-schedule-link .link-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 14px;
+}
+
+/* Schedule Items */
+.cal-schedule-items {
+    flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; gap: 0;
+    scrollbar-width: none;
+}
+.cal-schedule-items::-webkit-scrollbar { display: none; }
+
+.cal-schedule-class {
+    display: flex; gap: 12px; min-width: 200px; padding: 10px 0; cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cal-schedule-class:hover { transform: translateX(10px); }
+
+.cal-schedule-accent-bar {
+    width: 2px; border-radius: 2px; background: var(--surface2); align-self: stretch;
+    transition: width 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s;
+}
+.cal-schedule-class:hover .cal-schedule-accent-bar { width: 4px; }
+.cal-schedule-class.active .cal-schedule-accent-bar { width: 4px; background: var(--mauve); }
+
+.cal-schedule-class-info {
+    display: flex; flex-direction: column; gap: 6px; justify-content: center;
+}
+.cal-schedule-subject {
+    font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 900; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-schedule-class.active .cal-schedule-subject { color: var(--mauve); }
+.cal-schedule-class.past .cal-schedule-subject { color: var(--overlay0); }
+
+.cal-schedule-meta {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--overlay1);
+}
+.cal-schedule-meta .meta-icon { font-family: 'Iosevka Nerd Font', monospace; font-size: 14px; }
+.cal-schedule-class.active .meta-icon { color: var(--mauve); }
+
+.cal-schedule-room { color: var(--subtext1); }
+.cal-schedule-room-icon { color: var(--peach); }
+.cal-schedule-class.past .cal-schedule-room-icon { color: var(--surface2); }
+
+.cal-schedule-empty {
+    font-family: 'JetBrains Mono', monospace; font-style: italic; font-size: 14px;
+    color: var(--overlay0); display: flex; align-items: center; justify-content: center; flex: 1;
+}
+
+/* Break / gap items */
+.cal-schedule-gap {
+    min-width: 60px; display: flex; align-items: center; justify-content: center; position: relative;
+}
+.cal-schedule-gap-line {
+    position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: transparent;
+    transition: height 0.15s, background 0.15s;
+}
+.cal-schedule-gap:hover .cal-schedule-gap-line { height: 4px; background: var(--mauve); }

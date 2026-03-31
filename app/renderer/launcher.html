@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NixOS Desktop — App Launcher</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+    <div class="launcher-overlay" id="launcher-overlay">
+        <div class="launcher-panel" id="launcher-panel">
+            <!-- 左サイドバー -->
+            <div class="launcher-sidebar">
+                <div class="launcher-search-box">
+                    <span class="launcher-search-icon">󰍉</span>
+                    <input type="text" class="launcher-search-input" id="launcher-search" placeholder="Search applications..." autocomplete="off" spellcheck="false">
+                </div>
+                <div class="launcher-modes">
+                    <div class="launcher-mode active" data-mode="apps">
+                        <span class="launcher-mode-icon">󰀻</span> Apps
+                    </div>
+                    <div class="launcher-mode" data-mode="files">
+                        <span class="launcher-mode-icon">󰉋</span> Files
+                    </div>
+                    <div class="launcher-mode" data-mode="windows">
+                        <span class="launcher-mode-icon">󰍹</span> Windows
+                    </div>
+                </div>
+                <div class="launcher-sidebar-footer">
+                    <div class="launcher-footer-btn" title="Settings">
+                        <span class="launcher-footer-icon">󰒓</span>
+                    </div>
+                    <div class="launcher-footer-btn" title="Power">
+                        <span class="launcher-footer-icon">⏻</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右コンテンツ -->
+            <div class="launcher-content">
+                <div class="launcher-grid" id="launcher-grid">
+                    <!-- JSで動的生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="shared/colors.js"></script>
+    <script src="launcher.js"></script>
+</body>
+</html>

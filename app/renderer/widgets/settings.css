@@ -1,0 +1,98 @@
+/* ============================================================================
+   設定ウィジェット — API Keys & Preferences
+   ============================================================================ */
+
+.settings-widget {
+    display: flex; flex-direction: column; gap: 24px; padding: 30px;
+    height: 100%; overflow-y: auto;
+}
+
+.settings-header {
+    display: flex; align-items: center; gap: 14px;
+}
+.settings-header-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 28px; color: var(--mauve);
+}
+.settings-header-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 900; color: var(--text);
+}
+
+/* Section */
+.settings-section {
+    display: flex; flex-direction: column; gap: 14px;
+    background: rgba(var(--surface0-rgb), 0.4);
+    border-radius: 16px; border: 1px solid rgba(var(--text-rgb), 0.05);
+    padding: 20px;
+}
+.settings-section-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 900;
+    color: var(--subtext0); text-transform: uppercase; letter-spacing: 1.5px;
+    display: flex; align-items: center; gap: 10px;
+}
+.settings-section-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 16px;
+}
+
+/* Input Field Group */
+.settings-field {
+    display: flex; flex-direction: column; gap: 6px;
+}
+.settings-field-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+    color: var(--overlay1);
+}
+.settings-input {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    background: rgba(var(--surface0-rgb), 0.6);
+    border: 1px solid rgba(var(--text-rgb), 0.08);
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 600;
+    outline: none; transition: all 0.2s;
+}
+.settings-input::placeholder { color: var(--overlay0); }
+.settings-input:focus {
+    border-color: var(--mauve);
+    box-shadow: 0 0 0 3px rgba(var(--mauve-rgb), 0.15);
+}
+.settings-input:hover:not(:focus) {
+    border-color: rgba(var(--text-rgb), 0.15);
+}
+
+/* Save Button */
+.settings-save-row {
+    display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;
+}
+.settings-save-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 24px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--mauve), var(--blue));
+    border: none; color: var(--crust); font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 900; cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 16px rgba(var(--mauve-rgb), 0.3);
+}
+.settings-save-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(var(--mauve-rgb), 0.4);
+}
+.settings-save-btn:active { transform: scale(0.97); }
+
+.settings-save-btn .btn-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 16px;
+}
+
+/* Status message */
+.settings-status {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+    color: var(--green); opacity: 0; transition: opacity 0.3s;
+    display: flex; align-items: center; gap: 6px;
+}
+.settings-status.show { opacity: 1; }
+.settings-status .status-icon {
+    font-family: 'Iosevka Nerd Font', monospace; font-size: 14px;
+}
+
+/* API Key masked display */
+.settings-input[type="password"] {
+    letter-spacing: 3px;
+}

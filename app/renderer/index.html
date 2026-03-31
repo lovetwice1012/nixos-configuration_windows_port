@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NixOS Desktop — Top Bar</title>
+    <link rel="stylesheet" href="index.css">
+    <style>
+        /* Base imports to guarantee fonts since index.css was rewritten */
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800;900&display=swap');
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+
+        <!-- ════════════ LEFT SECTION ════════════ -->
+        <div class="left-layout" id="bar-left">
+
+            <!-- Launcher (Hamburger) -->
+            <div class="pill square search-pill" id="btn-launcher" style="font-size: 20px" title="App Launcher (Super+D)">󰣇</div>
+
+            <!-- 検索ボタン -->
+            <div class="pill square search-pill" id="btn-search" title="Global Search">󰍉</div>
+
+            <!-- 通知ボタン -->
+            <div class="pill square notif-pill" id="btn-notifications" title="Notifications (Super+A)"></div>
+
+            <!-- ワークスペース -->
+            <div class="workspaces-box" id="workspaces-container">
+            </div>
+
+            <!-- メディア（再生時のみ展開） -->
+            <div class="media-box" id="media-box">
+                <div class="media-content-parallax">
+                    <div class="media-info" id="media-info-click">
+                        <div class="media-art" id="media-art">
+                            <img src="" id="media-art-img" class="media-art-img" />
+                            <div class="media-art-overlay"></div>
+                        </div>
+                        <div class="media-text">
+                            <span class="media-title" id="media-title">Loading...</span>
+                            <span class="media-artist" id="media-artist"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════════ CENTER SECTION ════════════ -->
+        <div class="center-layout" id="bar-center">
+            <div class="center-box" id="clock-pill">
+                <div class="clock-box" id="clock-box">
+                    <span class="top-clock" id="clock-time">00:00:00 AM</span>
+                    <span class="top-date" id="clock-date">Monday, January 01</span>
+                </div>
+                <div class="weather-box" id="weather-box">
+                    <span class="top-weather-icon" id="top-weather-icon">󰖙</span>
+                    <span class="top-weather-temp" id="top-weather-temp">--°</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════════ RIGHT SECTION ════════════ -->
+        <div class="right-layout" id="bar-right">
+            <div class="sys-group">
+                <!-- WiFi -->
+                <div class="sub-pill" id="wifi-pill" title="Network">
+                    <span class="pill-icon" id="wifi-icon">󰤮</span>
+                    <span class="pill-label" id="wifi-ssid" style="font-size: 13px; font-weight: 800; color: var(--text);">—</span>
+                </div>
+
+                <!-- Bluetooth -->
+                <div class="sub-pill" id="bt-pill" title="Bluetooth">
+                    <span class="pill-icon" id="bt-icon">󰂲</span>
+                    <span class="pill-label" id="bt-device" style="font-size: 13px; font-weight: 800; color: var(--text); display: none;">—</span>
+                </div>
+
+                <!-- ボリューム -->
+                <div class="sub-pill" id="volume-pill" title="Volume">
+                    <span class="pill-icon" id="volume-icon">󰕾</span>
+                    <span class="pill-label" id="volume-percent" style="font-size: 13px; font-weight: 800; color: var(--text);">50%</span>
+                </div>
+
+                <!-- バッテリー -->
+                <div class="sub-pill" id="battery-pill" title="Battery">
+                    <span class="pill-icon" id="battery-icon">󰁹</span>
+                    <span class="pill-label" id="battery-percent" style="font-size: 13px; font-weight: 800; color: var(--text);">100%</span>
+                </div>
+            </div>
+
+            <!-- 右端の独立ピル（キーボードとトレイ） -->
+            <div class="pill square" id="kb-pill" title="Keyboard Layout">
+                <span id="kb-layout" style="font-family: 'JetBrains Mono'; font-size: 14px;">EN</span>
+            </div>
+
+            <div class="pill square" id="settings-pill" title="Settings">
+                <span class="pill-icon"></span>
+            </div>
+
+            <div class="pill square" id="tray-pill" title="System Tray">
+                <span class="pill-icon">󰍜</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS dependencies -->
+    <script src="index.js"></script>
+</body>
+</html>

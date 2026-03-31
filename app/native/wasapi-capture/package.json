@@ -1,0 +1,15 @@
+{
+  "name": "wasapi-capture",
+  "version": "1.0.0",
+  "description": "WASAPI loopback capture module for Electron",
+  "main": "build/Release/wasapi_capture.node",
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  },
+  "scripts": {
+    "build": "node-gyp rebuild"
+  },
+  "devDependencies": {
+    "node-gyp": "^12.2.0"
+  }
+}
